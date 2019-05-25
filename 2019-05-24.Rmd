@@ -26,7 +26,7 @@ library("Hmisc")
 
 ```
 
-Thanks everyone for the great response to my first post! I appreciated all your comments and suggestions. The mention on the cast last week was awesome – thanks again to everyone involved.
+Thanks everyone for the great response to my [first post](https://www.reddit.com/r/CompetitivePUBG/comments/bopz33/lucky_or_good_analyzing_npl_teams_by_circle_favor/). I appreciated all your comments and suggestions. The mention on the cast last week was awesome – thanks again to everyone involved.
 
 Before I get into this post, I want to address **the most common concern** from last week: that comparing team performance to how many circles they get **conflates a lot of factors** that aren’t technically circle luck. 
 
