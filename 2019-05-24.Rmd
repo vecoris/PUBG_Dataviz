@@ -1,0 +1,463 @@
+---
+title: "Week 3 Analysis: “All circles are equal, but...” (Part 1)"
+author: "u/firstoverall"
+date: 2019-05-24
+categories: ["NPL", "PUBG"]
+tags: ["NPL", "PUBG", "circle favor", "Phase 2"]
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(collapse = TRUE)
+library(here)
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(ggridges)
+library(viridis)
+library(magrittr)
+library(fmsb)
+library(cowplot)
+library("Hmisc")
+# library(corrplot)
+# library(olsrr)
+
+```
+
+Thanks everyone for the great response to my first post! I appreciated all your comments and suggestions. The mention on the cast last week was awesome – thanks again to everyone involved.
+
+Before I get into this post, I want to address **the most common concern** from last week: that comparing team performance to how many circles they get **conflates a lot of factors** that aren’t technically circle luck. 
+
+Just to clarify, **the goal with these charts was not to isolate the role of luck as strictly as possible**, it was to provide a way to compare teams in broadly the same situation **to see how teams perform relative to one another**, and relative to what’s predicted by their circle situation, regardless of how they got there.
+
+I also set out to show that **the game is more about skill than just luck**, because circle favor only explained 10% of point differences between teams (and only 8.5% as of this week’s data).
+
+Today’s post really got away from me, so I’m splitting it into two parts. The data I recorded and used is [here](link to data page), and my .Rmd file is [here](link to github), for those of you who are interested.
+
+First, an **updated “luck” plot** of relative performance for Week 3, with a dotted trace from Week 2 results:
+
+&#x200B;
+
+```{r week3_overview, include = FALSE}
+
+# read in the .csv
+luckloc <- here("static", "NPL_CircleFavor_Phase2_Week3.csv")
+luck <- read.csv(luckloc)
+
+# quick plot overview of the circle favor vs points data
+plot(luck$circle_favor_proportion, luck$total_points)
+abline(lm(luck$total_points ~ luck$circle_favor_proportion))
+
+# are they still correlated? yes
+cor.test(luck$circle_favor_proportion, luck$total_points)
+
+# does the circle still have an effect? yes (explains 8% of variance, still significant to p < 1x10^-8)
+summary(lm(luck$total_points ~ luck$circle_favor_proportion))
+
+```
+
+``` {r week3_circle_favor_plots, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# find the average of all match results for each team by grouping with dplyr
+summary_luck = group_by(luck, team)
+summary_luck = summarise(summary_luck, 
+                       mean_circle_favor = mean(circle_favor_proportion),
+                       mean_placement_points = mean(placement_points),
+                       mean_kill_points = mean(kill_points),
+                       mean_points = mean(total_points),
+                       mean_wins = mean(wins))
+str(summary_luck)
+
+# to create trend traces, first create a similarly grouped subset with data up to last week (this will be a rolling window)
+luck_week2 <- luck[1:256,]
+str(luck_week2)
+summary_luck_week2 = group_by(luck_week2, team)
+summary_luck_week2 = summarise(summary_luck_week2, 
+                          mean_circle_favor = mean(circle_favor_proportion),
+                       mean_placement_points = mean(placement_points),
+                       mean_kill_points = mean(kill_points),
+                       mean_points = mean(total_points),
+                       mean_wins = mean(wins))
+str(summary_luck_week2)
+
+# set up helvetica as the main font family for the summary plot
+quartzFonts(helvetica = c("Helvetica", 
+                          "Helvetica Bold",
+                          "Helvetica Italic",
+                          "Helvetica Light"))
+par(family = "helvetica")
+
+# create custom vector of team colors
+team_colors <- c("turquoise3","deepskyblue","darkorange1","palegreen3","darkred","gray50","black",
+                  "deeppink","midnightblue","slateblue2","firebrick3","forestgreen","blue3",
+                  "darkgoldenrod2","cornflowerblue","salmon")
+
+# create base plot of match points vs circle favor, constraining axes to centre the data
+plot(summary_luck$mean_circle_favor, 
+     summary_luck$mean_points, 
+     xlim = c(0.28, (2 * mean(luck$circle_favor_proportion)) - 0.28),
+     ylim = c(3.28, (2 * mean(luck$total_points)) - 3.28),
+     col = "white", # making data points white so we can superimpose team acronyms
+     ylab = "Points per Match",
+     xlab = "Proportion of Favorable Circles",
+     xaxt = "n",
+     cex.lab = 0.8,
+     cex.axis = 0.8)
+
+# save axis limits for labels later
+xmin <- 0.28
+xmax <- (2 * mean(luck$circle_favor_proportion)) - 0.28
+ymin <- 3.28
+ymax <- (2 * mean(luck$total_points)) - 3.28
+
+# constrain the x axis to have a reasonable number of ticks
+axis(side = 1, at = c(0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55), cex.axis = 0.8)
+
+# add team acronyms to the plot
+text(summary_luck$mean_circle_favor, 
+     summary_luck$mean_points, 
+     labels = summary_luck$team, 
+     cex = 0.9,
+     font = 2, # bold, the second out of the four font family options
+     col = team_colors)
+
+# add horizontal line with mean match points
+abline(h = mean(luck$total_points), col = "gray80")
+
+# add vertical line with mean circle favor
+abline(v = mean(luck$circle_favor_proportion), col = "gray80")
+
+# add linear model of relationship between match points and circle favor
+abline(lm(luck$total_points ~ luck$circle_favor_proportion))
+
+# add 1/2 standard deviation guides
+# first, find the intercept of the linear model to create 1/2 standard deviation guides
+luck_model <- lm(luck$total_points ~ luck$circle_favor_proportion)
+luck_intercept <- coef(luck_model)[1]
+
+# create intercepts and slopes for 1/2 standard deviation guides
+upper_sd_intercept <- luck_intercept + sd(luck$total_points) / 2
+lower_sd_intercept <- luck_intercept - sd(luck$total_points) / 2
+sd_slope <- coef(luck_model)[2]
+
+# add 1/2 standard deviation guides to the plot
+abline(upper_sd_intercept, sd_slope, col = "gray80")
+abline(lower_sd_intercept, sd_slope, col = "gray80")
+
+# add trend traces from week 2 to week 3 to the plot
+segments(summary_luck$mean_circle_favor, 
+         summary_luck$mean_points,
+         summary_luck_week2$mean_circle_favor, 
+         summary_luck_week2$mean_points,
+         col = team_colors, lty = "dotted", xpd = FALSE)
+
+# add corner labels to the plot, adjusting manually (smh)
+text(x = c(xmin - 0.003, xmax + 0.003, xmax + 0.003, xmin - 0.003), 
+     y = c(ymax - 0.068, ymax - 0.068, ymin + 0.068, ymin + 0.068), 
+     labels = c("DEFYING FATE", "#BLESSED", "YIKES ZONE", "CAN'T BLAME EM"), 
+     pos = c(4, 2, 2, 4),
+     col = "gray80",
+     cex = 0.7)
+
+```
+
+^*Figure 1: Total points per match for each NPL team based on circle favor, as of Phase 2, Week 3.*^
+
+&#x200B;
+
+Remember, **teams that are above the line are doing better than expected**, and teams below the line, worse. Endemic’s performance really stands out to me, as well as SSG’s. Excelerate has improved, and Ghost has been very consistent. Apologies to Simplicity and Denial, who are right on top of each other. You can see this broken down by kills and placement [here](link to breakdown page)
+
+Second, I replicated this chart with the mid game and late game circles – **circles 3 to 9 only**. A fair number of people were interested in seeing the effect of these circles alone, and I think it’s reasonable to be more interested in the late game, because anecdotally speaking, that’s when circles are more important.
+
+&#x200B;
+
+```{r week3_late_game_overview, include = FALSE}
+
+# read in the .csv
+lategame_luckloc <- here("static", "NPL_CircleFavor_Phase2_Week3_Circles3-9Only.csv")
+lategame_luck <- read.csv(lategame_luckloc)
+
+# quick plot overview of the circle favor vs points data
+plot(lategame_luck$circle_favor_proportion, lategame_luck$total_points)
+abline(lm(lategame_luck$total_points ~ lategame_luck$circle_favor_proportion))
+
+# are they still correlated? yes
+cor.test(lategame_luck$circle_favor_proportion, lategame_luck$total_points)
+
+# does the circle have a greater effect? yes! (explains 19% of variance, still significant to p < 1x10^-15)
+summary(lm(lategame_luck$total_points ~ lategame_luck$circle_favor_proportion))
+
+```
+
+```{r week3_late_game_comparison, echo = FALSE, results = "hide", fig.height = 4, fig.width = 10}
+
+# create a scatterplot of match points vs circle favor with the linear model plotted
+luck_plot <- ggplot(luck, aes(x = circle_favor_proportion, 
+                              y = total_points)) +
+                    geom_point(na.rm = TRUE) +
+                    geom_smooth(method = "lm", col = "black", size = 0.5, na.rm = TRUE) +
+                    ylab("Points per Match") +
+                    xlab("Proportion of Favorable Circles") +
+                    theme_minimal() +
+                    theme(axis.title.y = element_text(margin = margin(r = 20)), 
+                           axis.title.x = element_text(margin = margin(t = 20)))
+
+# create a scatterplot of match points vs circle favor for only circles 3 to 9, with the linear model plotted
+lategame_luck_plot <- ggplot(lategame_luck, 
+                             aes(x = circle_favor_proportion, 
+                                 y = total_points)) +
+                      geom_point(na.rm = TRUE) +
+                      geom_smooth(method = "lm", col = "black", size = 0.5, na.rm = TRUE) +
+                      ylab("Points per Match") +
+                      xlab("Proportion of Favorable Circles (Circles 3 to 9 Only)") +
+                      theme_minimal() +
+                      theme(axis.title.y = element_text(margin = margin(r = 20)), 
+                             axis.title.x = element_text(margin = margin(t = 20)))
+
+# plot these side by side
+comparison_plot <- plot_grid(luck_plot, lategame_luck_plot, labels = "AUTO")
+suppressMessages(print(comparison_plot))
+
+```
+
+^*Figure 2: A comparison of points per match based on circle favor in A) all circles and B) in circles 3 to 9 only, for all matches for all NPL teams, as of Phase 2, Week 3.*^
+
+
+``` {r week3_late_game_circle_favor_plots, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# find the average of all match results for each team by grouping with dplyr
+# omit circle favor results which are 0/0 or NA as the team was not present in any of circles 3-9
+summary_lategame_luck <- group_by(lategame_luck, team)
+summary_lategame_luck <- summarise(summary_lategame_luck, 
+                          mean_circle_favor = mean(na.omit(circle_favor_proportion)),
+                          mean_placement_points = mean(placement_points),
+                          mean_kill_points = mean(kill_points),
+                          mean_points = mean(total_points),
+                          mean_wins = mean(wins))
+str(summary_lategame_luck)
+
+# to create trend traces, first create a similarly grouped subset with data up to last week (this will be a rolling window)
+lategame_luck_week2 <- lategame_luck[1:256,]
+str(lategame_luck_week2)
+summary_lategame_luck_week2 <- group_by(lategame_luck_week2, team)
+summary_lategame_luck_week2 <- summarise(summary_lategame_luck_week2, 
+                                mean_circle_favor = mean(na.omit(circle_favor_proportion)),
+                                mean_placement_points = mean(placement_points),
+                                mean_kill_points = mean(kill_points),
+                                mean_points = mean(total_points),
+                                mean_wins = mean(wins))
+str(summary_lategame_luck_week2)
+
+# set up helvetica as the main font family for the summary plot
+quartzFonts(helvetica = c("Helvetica", 
+                          "Helvetica Bold",
+                          "Helvetica Italic",
+                          "Helvetica Light"))
+par(family = "helvetica")
+
+# create custom vector of team colors
+team_colors <- c("turquoise3","deepskyblue","darkorange1","palegreen3","darkred","gray50","black",
+                  "deeppink","midnightblue","slateblue2","firebrick3","forestgreen","blue3",
+                  "darkgoldenrod2","cornflowerblue","salmon")
+
+# create base plot of match points vs circle favor, constraining axes to centre the data
+plot(summary_lategame_luck$mean_circle_favor, 
+     summary_lategame_luck$mean_points, 
+     xlim = c(0.22, (2 * mean(na.omit(lategame_luck$circle_favor_proportion))) - 0.22),
+     ylim = c(3.28, (2 * mean(lategame_luck$total_points)) - 3.28),
+     col = "white", # making data points white so we can superimpose team acronyms
+     ylab = "Points per Match",
+     xlab = "Proportion of Favorable Circles",
+     xaxt = "n",
+     cex.lab = 0.8,
+     cex.axis = 0.8)
+
+# save axis limits for labels later
+lategame_xmin <- 0.22
+lategame_xmax <- (2 * mean(na.omit(lategame_luck$circle_favor_proportion))) - 0.22
+lategame_ymin <- 3.28
+lategame_ymax <- (2 * mean(lategame_luck$total_points)) - 3.28
+
+# constrain the x axis to have a reasonable number of ticks
+axis(side = 1, at = c(0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55), cex.axis = 0.8)
+
+# add team acronyms to the plot
+text(summary_lategame_luck$mean_circle_favor, 
+     summary_lategame_luck$mean_points, 
+     labels = summary_lategame_luck$team, 
+     cex = 0.9,
+     font = 2, # bold, the second out of the four font family options
+     col = team_colors)
+
+# add horizontal line with mean match points
+abline(h = mean(lategame_luck$total_points) + 0.05, col = "gray80")
+
+# add vertical line with mean circle favor
+abline(v = mean(na.omit(lategame_luck$circle_favor_proportion)), col = "gray80")
+
+# add linear model of relationship between match points and circle favor
+abline(lm(lategame_luck$total_points ~ lategame_luck$circle_favor_proportion))
+
+# add 1/2 standard deviation guides
+# first, find the intercept of the linear model to create 1/2 standard deviation guides
+lategame_luck_model <- lm(lategame_luck$total_points ~ lategame_luck$circle_favor_proportion)
+lategame_luck_intercept <- coef(lategame_luck_model)[1]
+
+# create intercepts and slopes for 1/2 standard deviation guides
+lategame_upper_sd_intercept <- lategame_luck_intercept + sd(lategame_luck$total_points) / 2
+lategame_lower_sd_intercept <- lategame_luck_intercept - sd(lategame_luck$total_points) / 2
+lategame_sd_slope <- coef(lategame_luck_model)[2]
+
+# add 1/2 standard deviation guides to the plot
+abline(lategame_upper_sd_intercept, lategame_sd_slope, col = "gray80")
+abline(lategame_lower_sd_intercept, lategame_sd_slope, col = "gray80")
+
+# add trend traces from week 2 to week 3 to the plot
+segments(summary_lategame_luck$mean_circle_favor, 
+         summary_lategame_luck$mean_points,
+         summary_lategame_luck_week2$mean_circle_favor, 
+         summary_lategame_luck_week2$mean_points,
+         col = team_colors, lty = "dotted", xpd = FALSE)
+
+# add corner labels to the plot, adjusting manually (smh)
+text(x = c(lategame_xmin - 0.003, lategame_xmax + 0.003, lategame_xmax + 0.003, lategame_xmin - 0.003), 
+     y = c(lategame_ymax - 0.068, lategame_ymax - 0.068, lategame_ymin + 0.068, lategame_ymin + 0.068), 
+     labels = c("DEFYING FATE", "#BLESSED", "YIKES ZONE", "CAN'T BLAME EM"), 
+     pos = c(4, 2, 2, 4),
+     col = "gray80",
+     cex = 0.7)
+
+```
+^*Figure 3: Total points per match for each NPL team based on circle favor in circles 3 to 9 only, as of Phase 2, Week 3.*^
+
+&#x200B;
+
+As it turns out, these circles alone do have a **much greater effect** on the results of matches. You can see the basic difference in the impact of these circles in figure 2: the slope of the line in B) is sharper, meaning the effect of circle favor in later circles is more pronounced.
+
+In the "luck" plot, Rumblers and Endemic stand out again, and Lazarus seems to do slightly more poorly later on in the game (no hate – it's a very small difference!).
+
+Circles 3 to 9 explain **19% of the variation between teams** in points earned per match (R^2^ = 0.1896, p < 1 x 10^-15^). However, as many commenters pointed out, discarding data is probably **not the best way** to determine which circles are really the most important.
+
+So, how do we go beyond the anecdotes and common knowledge that circles are more important later on, and figure out **which circles actually have the most impact on the game**?
+
+I created a **ridgeline plot** that shows the **points per match based on circle favor in each circle**. The data for points per match is from all teams, in all matches.
+
+&#x200B;
+
+```{r circle_importance_viz, echo = FALSE, results = "hide", fig.height = 12, fig.width = 7.5}
+
+# create a new dataset with each match record repeated for each circle favored
+luckloc <- here("static", "NPL_CircleFavor_Phase2_Week3.csv")
+luck <- read.csv(luckloc)
+
+# create a subset of this dataset with all matches for all teams where the team was favored in circle 1
+favored_circle1 <- dplyr::filter(luck, alive_circle1 == 1 & favored_circle1 == 1)
+favored_circle1 %>% glimpse()
+
+# add a new column named "favor" with the observation "Favored in Circle 1" to all of these records
+favored_circle1 <- mutate(favored_circle1, favor = "Favored in Circle 1")
+favored_circle1 %>% glimpse()
+
+# create a subset of this dataset with all matches for all teams where the team was NOT favored in circle 1
+not_favored_circle1 <- dplyr::filter(luck, alive_circle1 == 1 & favored_circle1 == 0)
+not_favored_circle1 <- mutate(not_favored_circle1, favor = "Not Favored in Circle 1")
+not_favored_circle1 %>% glimpse()
+
+# repeat these two steps for all circles
+# GOD I should have automated this - but in the end would that maybe have taken longer?
+
+favored_circle2 <- dplyr::filter(luck, alive_circle2 == 1 & favored_circle2 == 1)
+favored_circle2 <- mutate(favored_circle2, favor = "Favored in Circle 2")
+not_favored_circle2 <- dplyr::filter(luck, alive_circle2 == 1 & favored_circle2 == 0)
+not_favored_circle2 <- mutate(not_favored_circle2, favor = "Not Favored in Circle 2")
+favored_circle3 <- dplyr::filter(luck, alive_circle3 == 1 & favored_circle3 == 1)
+favored_circle3 <- mutate(favored_circle3, favor = "Favored in Circle 3")
+not_favored_circle3 <- dplyr::filter(luck, alive_circle3 == 1 & favored_circle3 == 0)
+not_favored_circle3 <- mutate(not_favored_circle3, favor = "Not Favored in Circle 3")
+favored_circle4 <- dplyr::filter(luck, alive_circle4 == 1 & favored_circle4 == 1)
+favored_circle4 <- mutate(favored_circle4, favor = "Favored in Circle 4")
+not_favored_circle4 <- dplyr::filter(luck, alive_circle4 == 1 & favored_circle4 == 0)
+not_favored_circle4 <- mutate(not_favored_circle4, favor = "Not Favored in Circle 4")
+favored_circle5 <- dplyr::filter(luck, alive_circle5 == 1 & favored_circle5 == 1)
+favored_circle5 <- mutate(favored_circle5, favor = "Favored in Circle 5")
+not_favored_circle5 <- dplyr::filter(luck, alive_circle5 == 1 & favored_circle5 == 0)
+not_favored_circle5 <- mutate(not_favored_circle5, favor = "Not Favored in Circle 5")
+favored_circle6 <- dplyr::filter(luck, alive_circle6 == 1 & favored_circle6 == 1)
+favored_circle6 <- mutate(favored_circle6, favor = "Favored in Circle 6")
+not_favored_circle6 <- dplyr::filter(luck, alive_circle6 == 1 & favored_circle6 == 0)
+not_favored_circle6 <- mutate(not_favored_circle6, favor = "Not Favored in Circle 6")
+favored_circle7 <- dplyr::filter(luck, alive_circle7 == 1 & favored_circle7 == 1)
+favored_circle7 <- mutate(favored_circle7, favor = "Favored in Circle 7")
+not_favored_circle7 <- dplyr::filter(luck, alive_circle7 == 1 & favored_circle7 == 0)
+not_favored_circle7 <- mutate(not_favored_circle7, favor = "Not Favored in Circle 7")
+favored_circle8 <- dplyr::filter(luck, alive_circle8 == 1 & favored_circle8 == 1)
+favored_circle8 <- mutate(favored_circle8, favor = "Favored in Circle 8")
+not_favored_circle8 <- dplyr::filter(luck, alive_circle8 == 1 & favored_circle8 == 0)
+not_favored_circle8 <- mutate(not_favored_circle8, favor = "Not Favored in Circle 8")
+favored_circle9 <- dplyr::filter(luck, alive_circle9 == 1 & favored_circle9 == 1)
+favored_circle9 <- mutate(favored_circle9, favor = "Favored in Circle 9")
+not_favored_circle9 <- dplyr::filter(luck, alive_circle9 == 1 & favored_circle9 == 0)
+not_favored_circle9 <- mutate(not_favored_circle9, favor = "Not Favored in Circle 9")
+not_favored_circle9 %>% glimpse() # 247 before fixing, 32 after fixing!
+
+# merge this franken-database back together, curse myself
+
+ridgeline_data <- bind_rows(favored_circle1, not_favored_circle1, favored_circle2, not_favored_circle2, favored_circle3, not_favored_circle3, favored_circle4, not_favored_circle4, favored_circle5, not_favored_circle5, favored_circle6, not_favored_circle6, favored_circle7, not_favored_circle7, favored_circle8, not_favored_circle8, favored_circle9, not_favored_circle9)
+ridgeline_data %>% glimpse()
+
+level_order <- factor(ridgeline_data$favor, level = c("Not Favored in Circle 9", "Favored in Circle 9", "Not Favored in Circle 8", "Favored in Circle 8", "Not Favored in Circle 7", "Favored in Circle 7", "Not Favored in Circle 6", "Favored in Circle 6", "Not Favored in Circle 5", "Favored in Circle 5", "Not Favored in Circle 4", "Favored in Circle 4", "Not Favored in Circle 3", "Favored in Circle 3", "Not Favored in Circle 2", "Favored in Circle 2", "Not Favored in Circle 1", "Favored in Circle 1"))
+ridgeline_plot <- ggplot(ridgeline_data, 
+                         aes(x = total_points, 
+                             y = level_order, 
+                             fill = ..x..)) +
+     xlab("Total Points per Match") +
+     ylab("Circle Favor in Each Circle") +
+     geom_density_ridges_gradient(scale = 1.45,
+                                 rel_min_height = 0.007, 
+                                 gradient_lwd = 1, 
+                                 show.legend = FALSE,
+                                 quantile_lines = TRUE,
+                                 quantile_fun = mean,
+                                 vline_color = "white") +
+     scale_fill_viridis(option = "viridis", direction = -1) +
+     theme_minimal() +
+     theme(axis.title.y = element_text(margin = margin(r = 20)), 
+           axis.title.x = element_text(margin = margin(t = 20)))
+suppressMessages(print(ridgeline_plot))
+
+```
+^*Figure 4: Ridgeline plot of total points per match for all teams in all matches, grouped by favor in each circle, as of Phase 2, Week 3.*^
+
+&#x200B;
+
+A ridgeline plot shows the density plot (basically a smoothed histogram) of the distribution of a variable, and compares different scenarios. Here, I plotted the distribution of points in all matches, separated out by luck with each circle, so **we can see the difference in results based on being favored or not favored by each circle**. The vertical **white lines are the average points per match** that teams ended up with if they were in, or not in, that particular circle. This type of plot might look unfamiliar, but it’s essentially a set of histograms, or sideways boxplots (or bee plots, or violin plots) stacked on top of each other.
+
+At first glance, it looks as though **circles 4, 5, and 6,** where the averages are farthest apart depending on whether or not that circle was favorable, are the **circles that make the most difference** in the final result of a match.
+
+```{r each_circle, include = FALSE}
+
+# determine the impact of favor in each circle individually
+summary(lm(luck$total_points ~ luck$favored_circle1))
+summary(lm(luck$total_points ~ luck$favored_circle2))
+summary(lm(luck$total_points ~ luck$favored_circle3))
+summary(lm(luck$total_points ~ luck$favored_circle4))
+summary(lm(luck$total_points ~ luck$favored_circle5))
+summary(lm(luck$total_points ~ luck$favored_circle6))
+summary(lm(luck$total_points ~ luck$favored_circle7))
+summary(lm(luck$total_points ~ luck$favored_circle8))
+summary(lm(luck$total_points ~ luck$favored_circle9))
+```
+
+To verify this, I first looked at the impact of each circle on points by taking each circle as an individual variable. Circles 4, 5, and 6 were in fact the most influential, and **circle 4 had the greatest impact**. Circle 4 alone could explain **21.6%** of the variance in points (R^2^ = 0.2159, p p < 1x10^-15^); circle 5 could explain 18.4%; and circle 6, 12.0% (R^2^ = 0.1838, p < 1x10^-13^; R^2^ = 0.1204, p < 1x10^-6).
+
+Interestingly, **circle 1 had no significant effect on match results whatsoever**. Teams that were in circle 1 performed no differently on average than teams that were not in circle 1. That’s surprising, because I would have expected a boost in points from better loot or quicker rotations or something along those lines, but it doesn’t seem to even be a factor. This might be because of the high loot settings.
+
+Circles 2, 3, 7, 8, and 9 all also had a significant effect on the game (p < 0.042 at most), but the effects were much smaller; these circles explainied between 1.6% and 6.6% of the variance on their own.
+
+Unfortunately, when I put together the full multiple linear regression model for all the circles together, only circle 9 was individually significant. This doesn’t mean that circles have no individual impact on the game, and it doesn’t negate their individual impact. It just **most likely indicates multicollinearity** – i.e. a few of these circles are no additionally better at explaining variance in the data than others. I’ll probably have to use PCA or partial least squares regression to figure out which are the most important contributors in the full model. But it’s taken me long enough to make these plots and work this all out, so I didn’t want to do it quickly and slap up something poorly explained. 
+
+Stay tuned for Part 2 next week, where I will try to answer the question: **how many additional points do you get for being in any given circle?**
+
+&#x200B;
+
+**tl;dr Circle 4 appears to be the most influential, late game circles do have more of an impact, and Endemic and Rumblers are doing particularly well.**
