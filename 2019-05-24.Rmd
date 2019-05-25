@@ -433,7 +433,7 @@ suppressMessages(print(ridgeline_plot))
 
 &#x200B;
 
-Here, I plotted the distribution of points in all matches, separated out by luck with each circle, so **we can see the difference in results based on being favored or not favored by each circle**. The vertical **white lines are the average points per match** that teams ended up with if they were in, or not in, that particular circle. This type of plot might look unfamiliar, but it’s essentially a set of histograms, or sideways boxplots (or bee plots, or violin plots) stacked on top of each other. A ridgeline plot shows the density plot of the distribution of a variable, and compares different scenarios. 
+Here, I plotted the distribution of points in all matches, separated out by luck with each circle, so **we can see the difference in results based on being favored or not favored by each circle**. The vertical **white lines are the average points per match** that teams ended up with if they were in, or not in, that particular circle. This type of plot might look unfamiliar, but it’s essentially a set of histograms, or sideways boxplots (or bee plots, or violin plots) stacked on top of each other. A ridgeline plot shows the density plot of the distribution of a variable, and compares different scenarios that might affect that variable. 
 
 At first glance, it looks as though **circles 4, 5, and 6,** where the averages are farthest apart depending on whether or not that circle was favorable, are the **circles that make the most difference** in the final result of a match.
 
