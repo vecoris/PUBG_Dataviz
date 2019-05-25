@@ -1,5 +1,5 @@
 ---
-title: "Week 3 Analysis: “All circles are equal, but...” (Part 1)"
+title: "Week 3 NPL Analysis: “All circles are equal, but...” (Part 1)"
 author: "u/firstoverall"
 date: 2019-05-24
 categories: ["NPL", "PUBG"]
@@ -22,6 +22,8 @@ library("Hmisc")
 # library(corrplot)
 # library(olsrr)
 
+# below you will find the gory R code of a biologist, proceed with caution
+
 ```
 
 Thanks everyone for the great response to my first post! I appreciated all your comments and suggestions. The mention on the cast last week was awesome – thanks again to everyone involved.
@@ -32,7 +34,7 @@ Just to clarify, **the goal with these charts was not to isolate the role of luc
 
 I also set out to show that **the game is more about skill than just luck**, because circle favor only explained 10% of point differences between teams (and only 8.5% as of this week’s data).
 
-Today’s post really got away from me, so I’m splitting it into two parts. The data I recorded and used is [here](link to data page), and my .Rmd file is [here](link to github), for those of you who are interested.
+Today’s post really got away from me, so I’m splitting it into two parts. The data I recorded and used is [here](https://pubgdataviz.netlify.com/post/Public_Data/), and my .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-05-24.Rmd), for those of you who are interested.
 
 First, an **updated “luck” plot** of relative performance for Week 3, with a dotted trace from Week 2 results:
 
@@ -165,7 +167,9 @@ text(x = c(xmin - 0.003, xmax + 0.003, xmax + 0.003, xmin - 0.003),
 
 &#x200B;
 
-Remember, **teams that are above the line are doing better than expected**, and teams below the line, worse. Endemic’s performance really stands out to me, as well as SSG’s. Excelerate has improved, and Ghost has been very consistent. Apologies to Simplicity and Denial, who are right on top of each other. You can see this broken down by kills and placement [here](link to breakdown page)
+Remember, **teams that are above the line are doing better than expected**, and teams below the line, worse. Endemic’s performance really stands out to me, as well as SSG’s. Excelerate has improved, and Ghost has been very consistent. Apologies to Simplicity and Denial, who are right on top of each other. You can see this broken down by kills and placement [here](https://pubgdataviz.netlify.com/post/Updated_Luck_Plots/).
+
+&#x200B;
 
 Second, I replicated this chart with the mid game and late game circles – **circles 3 to 9 only**. A fair number of people were interested in seeing the effect of these circles alone, and I think it’s reasonable to be more interested in the late game, because anecdotally speaking, that’s when circles are more important.
 
@@ -188,7 +192,6 @@ cor.test(lategame_luck$circle_favor_proportion, lategame_luck$total_points)
 summary(lm(lategame_luck$total_points ~ lategame_luck$circle_favor_proportion))
 
 ```
-
 ```{r week3_late_game_comparison, echo = FALSE, results = "hide", fig.height = 4, fig.width = 10}
 
 # create a scatterplot of match points vs circle favor with the linear model plotted
@@ -344,7 +347,7 @@ I created a **ridgeline plot** that shows the **points per match based on circle
 
 &#x200B;
 
-```{r circle_importance_viz, echo = FALSE, results = "hide", fig.height = 12, fig.width = 7.5}
+```{r circle_importance_viz, echo = FALSE, results = "hide", fig.height = 9, fig.width = 7.5}
 
 # create a new dataset with each match record repeated for each circle favored
 luckloc <- here("static", "NPL_CircleFavor_Phase2_Week3.csv")
@@ -412,7 +415,7 @@ ridgeline_plot <- ggplot(ridgeline_data,
                              fill = ..x..)) +
      xlab("Total Points per Match") +
      ylab("Circle Favor in Each Circle") +
-     geom_density_ridges_gradient(scale = 1.45,
+     geom_density_ridges_gradient(scale = 1.7,
                                  rel_min_height = 0.007, 
                                  gradient_lwd = 1, 
                                  show.legend = FALSE,
@@ -430,7 +433,7 @@ suppressMessages(print(ridgeline_plot))
 
 &#x200B;
 
-A ridgeline plot shows the density plot (basically a smoothed histogram) of the distribution of a variable, and compares different scenarios. Here, I plotted the distribution of points in all matches, separated out by luck with each circle, so **we can see the difference in results based on being favored or not favored by each circle**. The vertical **white lines are the average points per match** that teams ended up with if they were in, or not in, that particular circle. This type of plot might look unfamiliar, but it’s essentially a set of histograms, or sideways boxplots (or bee plots, or violin plots) stacked on top of each other.
+Here, I plotted the distribution of points in all matches, separated out by luck with each circle, so **we can see the difference in results based on being favored or not favored by each circle**. The vertical **white lines are the average points per match** that teams ended up with if they were in, or not in, that particular circle. This type of plot might look unfamiliar, but it’s essentially a set of histograms, or sideways boxplots (or bee plots, or violin plots) stacked on top of each other. A ridgeline plot shows the density plot of the distribution of a variable, and compares different scenarios. 
 
 At first glance, it looks as though **circles 4, 5, and 6,** where the averages are farthest apart depending on whether or not that circle was favorable, are the **circles that make the most difference** in the final result of a match.
 
@@ -448,7 +451,7 @@ summary(lm(luck$total_points ~ luck$favored_circle8))
 summary(lm(luck$total_points ~ luck$favored_circle9))
 ```
 
-To verify this, I first looked at the impact of each circle on points by taking each circle as an individual variable. Circles 4, 5, and 6 were in fact the most influential, and **circle 4 had the greatest impact**. Circle 4 alone could explain **21.6%** of the variance in points (R^2^ = 0.2159, p p < 1x10^-15^); circle 5 could explain 18.4%; and circle 6, 12.0% (R^2^ = 0.1838, p < 1x10^-13^; R^2^ = 0.1204, p < 1x10^-6).
+To verify this, I first looked at the impact of each circle on points by taking each circle as an individual variable in a linear model. Circles 4, 5, and 6 were in fact the most influential, and **circle 4 had the greatest impact**. Circle 4 alone could explain **21.6%** of the variance in points (R^2^ = 0.2159, p p < 1x10^-15^); circle 5 could explain 18.4%; and circle 6, 12.0% (R^2^ = 0.1838, p < 1x10^-13^; R^2^ = 0.1204, p < 1x10^-6).
 
 Interestingly, **circle 1 had no significant effect on match results whatsoever**. Teams that were in circle 1 performed no differently on average than teams that were not in circle 1. That’s surprising, because I would have expected a boost in points from better loot or quicker rotations or something along those lines, but it doesn’t seem to even be a factor. This might be because of the high loot settings.
 
@@ -456,8 +459,8 @@ Circles 2, 3, 7, 8, and 9 all also had a significant effect on the game (p < 0.0
 
 Unfortunately, when I put together the full multiple linear regression model for all the circles together, only circle 9 was individually significant. This doesn’t mean that circles have no individual impact on the game, and it doesn’t negate their individual impact. It just **most likely indicates multicollinearity** – i.e. a few of these circles are no additionally better at explaining variance in the data than others. I’ll probably have to use PCA or partial least squares regression to figure out which are the most important contributors in the full model. But it’s taken me long enough to make these plots and work this all out, so I didn’t want to do it quickly and slap up something poorly explained. 
 
-Stay tuned for Part 2 next week, where I will try to answer the question: **how many additional points do you get for being in any given circle?**
+Stay tuned for Part 2 next week, where I will try to answer the question: **how many additional points do you get for being in any given circle?** I will also work on some more of your suggestions.
 
 &#x200B;
 
-**tl;dr Circle 4 appears to be the most influential, late game circles do have more of an impact, and Endemic and Rumblers are doing particularly well.**
+**tl;dr Circle 4 appears to be the most influential, late game circles do have more of an impact while circle 1 has almost no impact, and Endemic and Rumblers are doing particularly well.**
