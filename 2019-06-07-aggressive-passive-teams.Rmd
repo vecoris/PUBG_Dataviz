@@ -1,0 +1,473 @@
+---
+title: "Week 4 NPL Analysis: Comparing Aggressive and Passive Play Styles"
+author: "u/firstoverall"
+date: 2019-06-07
+categories: ["NPL", "PUBG"]
+tags: ["NPL", "PUBG", "circle favor", "Phase 2"]
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(collapse = TRUE)
+library(here)
+library(knitr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(viridis)
+library(magrittr)
+library(httr)
+library(jsonlite)
+library(tibble)
+
+# below you will find the gory R code of a biologist, proceed with caution
+
+```
+&#x200B;
+
+Why do some NPL teams seem to be able to keep a full squad alive until the late game, while others hang on with only one or two players? **Which teams are better defensively, and which teams are better offensively?** How do these strengths stack up relative to other teams?
+
+This week I took a stab at answering these questions with a new plot that, well, looks remarkably like my old plot. 
+
+Let’s take a look at the old plot first.
+
+&#x200B;
+
+**WEEK 4 "LUCK" PLOT**
+
+&#x200B;
+
+```{r luck_overview, include = FALSE}
+
+# read in the .csv
+luckloc <- here("static", "NPL_CircleFavor_Phase2_Week4.csv") 
+luck <- read.csv(luckloc)
+
+# quick plot overview of the circle favor vs points data
+plot(luck$circle_favor_proportion, luck$total_points)
+abline(lm(luck$total_points ~ luck$circle_favor_proportion))
+
+# circles with significant impact on points only
+plot(luck$X34569_favor_proportion, luck$total_points)
+abline(lm(luck$total_points ~ luck$X34569_favor_proportion))
+
+# are they still correlated?
+cor.test(luck$circle_favor_proportion, luck$total_points) # yes, 0.25
+cor.test(luck$X34569_favor_proportion, luck$total_points) # yes, 0.42
+
+# does the circle still have an effect? 
+summary(lm(luck$total_points ~ luck$circle_favor_proportion)) # yes (explains 6.3% of variance, still significant to p < 1x10^-8)
+summary(lm(luck$total_points ~ luck$X34569_favor_proportion)) # yes (explains 17.7% of variance, still significant to p < 1x10^-15)
+
+```
+
+
+``` {r sig_circle_favor_plots, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# issue with matching up stems from mean of points per match not removing the same NA as circle favor proportion
+# solution is to take mean of points per match from the subset with no NA in cfp
+no_cfp_na_luck <- filter(luck, !is.na(X34569_favor_proportion))
+str(no_cfp_na_luck)
+# checking that this yields the correct number of values
+v1 <-  luck$X34569_favor_proportion
+length(v1[!is.na(v1)])
+
+# find the average of all match results for each team by grouping with dplyr
+summary_luck <- group_by(luck, team)
+summary_luck <- summarise(summary_luck, 
+                       mean_X34569_favor = mean(X34569_favor_proportion,
+                                                 na.rm = TRUE),
+                       mean_placement_points = mean(placement_points),
+                       mean_kill_points = mean(kill_points),
+                       mean_points = mean(total_points),
+                       mean_wins = mean(wins))
+str(summary_luck)
+
+# to create trend traces, first create a similarly grouped subset with data up to last week (this will be a rolling window)
+luck_week3 <- filter(luck, match < 25)
+str(luck_week3)
+summary_luck_week3 <- group_by(luck_week3, team)
+summary_luck_week3 <- summarise(summary_luck_week3, 
+                          mean_X34569_favor = mean(X34569_favor_proportion,
+                                                 na.rm = TRUE),
+                          mean_placement_points = mean(placement_points),
+                          mean_kill_points = mean(kill_points),
+                          mean_points = mean(total_points),
+                          mean_wins = mean(wins))
+str(summary_luck_week3)
+
+# set up helvetica as the main font family for the summary plot
+quartzFonts(helvetica = c("Helvetica", 
+                          "Helvetica Bold",
+                          "Helvetica Italic",
+                          "Helvetica Light"))
+par(family = "helvetica")
+
+# create custom vector of team colors
+team_colors <- c("turquoise3","deepskyblue","darkorange1","palegreen3",
+                 "darkred","gray50","black","deeppink",
+                 "midnightblue","slateblue2","firebrick3","forestgreen",
+                 "blue3","darkgoldenrod2","cornflowerblue","salmon")
+
+
+# create base plot of match points vs circle favor, constraining axes to centre the data
+plot(summary_luck$mean_X34569_favor, 
+     summary_luck$mean_points, 
+     xlim = c(0.26, (2 * mean(luck$X34569_favor_proportion, 
+                              na.rm = TRUE)) - 0.26),
+     ylim = c(3.2, (2 * mean(luck$total_points)) - 3.2),
+     col = "white", # making data points white so we can superimpose team acronyms
+     ylab = "Points per Match",
+     xlab = "Proportion of Favorable Circles",
+     cex.lab = 0.8,
+     cex.axis = 0.8)
+
+# save axis limits for labels later
+xmin <- 0.26
+xmax <- (2 * mean(luck$X34569_favor_proportion, 
+                  na.rm = TRUE)) - 0.26
+ymin <- 3.2
+ymax <- (2 * mean(luck$total_points)) - 3.2
+
+# constrain the x axis to have a reasonable number of ticks
+axis(side = 1, at = c(0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55), cex.axis = 0.8)
+
+# add horizontal line with mean match points
+abline(h = mean(no_cfp_na_luck$total_points), col = "gray80")
+# phew this works to centre all the lines up!
+
+# add vertical line with mean circle favor
+abline(v = mean(luck$X34569_favor_proportion, 
+                na.rm = TRUE), col = "gray80")
+
+# add linear model of relationship between match points and circle favor
+abline(lm(luck$total_points ~ luck$X34569_favor_proportion))
+
+# add 1/2 standard deviation guides
+# first, find the intercept of the linear model to create 1/2 standard deviation guides
+luck_model <- lm(luck$total_points ~ luck$X34569_favor_proportion)
+luck_intercept <- coef(luck_model)[1]
+
+# create intercepts and slopes for 1/2 standard deviation guides
+upper_sd_intercept <- luck_intercept + sd(luck$total_points)/2
+lower_sd_intercept <- luck_intercept - sd(luck$total_points)/2
+sd_slope <- coef(luck_model)[2]
+
+# add standard deviation guides to the plot
+abline(upper_sd_intercept, sd_slope, col = "gray80")
+abline(lower_sd_intercept, sd_slope, col = "gray80")
+
+# add corner labels to the plot, adjusting manually (smh)
+text(x = c(xmin - 0.004, xmax + 0.004, xmax + 0.004, xmin - 0.004), 
+     y = c(ymax - 0.06, ymax - 0.06, ymin + 0.06, ymin + 0.06), 
+     labels = c("DEFYING FATE", "#BLESSED", "YIKES ZONE", "CAN'T BLAME EM"), 
+     pos = c(4, 2, 2, 4),
+     col = "gray80",
+     cex = 0.7)
+
+# add trend traces from week 3 to week 4 to the plot
+segments(summary_luck$mean_X34569_favor, 
+         summary_luck$mean_points,
+         summary_luck_week3$mean_X34569_favor, 
+         summary_luck_week3$mean_points,
+         col = team_colors, lty = "dotted", xpd = FALSE)
+
+# add team acronyms to the plot
+text(summary_luck$mean_X34569_favor, 
+     summary_luck$mean_points, 
+     labels = summary_luck$team, 
+     cex = 0.9,
+     font = 2, # bold, the second out of the four font family options
+     col = team_colors)
+
+```
+
+^*Figure 1: Total points per match for each NPL team based on circle favor, as of Phase 2, Week 4. Teams that are above the black line performed better than expected, and teams below the line, worse. The gray lines represent one standard deviation from the mean in points per match. The dotted trace represents the change in performance from Week 3 to Week 4.*^
+
+&#x200B;
+
+If you’ve seen my posts before, you know what this plot shows. A breakdown by kill points and placement points can be found [here](https://pubgdataviz.netlify.com/post/Phase2_Week4_Luck_Plots/).
+
+Shoutout to **Rumblers, Spacestation, and Endemic, who are really outperforming their luck.** Wildcard and Denial seem to be trending in the wrong direction this week.
+
+I tweaked this plot a bit this week, based on my work [last week](https://pubgdataviz.netlify.com/post/2019-05-31-how-many-points-for-each-circle/). The proportion of favorable circles on the x-axis here is still the fraction of circles that landed on a team out of all the circles they were alive for, but what’s new is that I calculated this solely based on circles 3, 4, 5, 6, and 9, which are the only circles that have a significant impact on the game.
+This new measure of circle favor explains 18% of variance in match results (R^2^ = 0.1771, p < 1x10^-15^).
+
+Moving forward, my goal is to try to create models of team performance that incorporate more than just circle favor, because it’s really not the be-all and end-all of team evaluation, as many people have mentioned. But in order to do that, I need to get better at using the PUBG API, so this week I worked on a simpler question.
+
+&#x200B;
+
+**AGGRESSIVE AND PASSIVE PLAY STYLES**
+
+&#x200B;
+
+**What are teams good at, compared to other teams?** Are they better at shooting everyone else, or better at staying out of the way? **Does playing aggressively always come at a cost?**
+
+To look into this, I plotted each team’s **damage output versus the damage they allowed against them**, averaged over all 32 games of Phase 2 so far.
+
+&#x200B;
+
+``` {r playstyle_data, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# set local time zone
+Sys.setenv(TZ = "MST")
+
+# create dataframe of each team's damage taken in match 1 to build on below
+url1  <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/04/21/41/701564cb-6eb5-11e9-ab88-0a586465861c-telemetry.json"
+dmg <- GET(url = url1)
+dmg <- rawToChar(dmg$content)
+dmg <- fromJSON(dmg) %>% 
+  as.data.frame %>% 
+  dplyr::select(c(5, victim, damage)) %>% 
+  flatten() %>%
+  dplyr::select(c(1, damage, victim.name, victim.teamId)) %>%
+  rename(event_type = "_T") %>%
+  filter(event_type == "LogPlayerTakeDamage")
+team_dmg <- group_by(dmg, victim.teamId) %>%
+  summarise(sum_dmg = sum(damage))
+phase2_dmg <- team_dmg
+str(phase2_dmg)
+
+# create a function to build on dataframe with each team's damage taken per match
+sum.dmg.function <- function(url, incremental_match_dmg){
+dmg <- GET(url = url) # obtain json file from pubg api
+dmg <- rawToChar(dmg$content) # convert from unicode data to a single string with json file
+dmg <- jsonlite::fromJSON(dmg) %>%  # convert to object interpretable by r (there are multiple packages that do this)
+  as.data.frame %>% # convert to data frame, which is really a nasty set of nested lists
+  dplyr::select(c(5, victim, damage)) %>% # drop all fields except variables of interest
+  flatten() %>% # fix nested structure, sort of
+  dplyr::select(c(1, damage, victim.name, victim.teamId)) %>% # again drop unused fields
+  rename(event_type = "_T") %>% # rename field to something r can work with
+  filter(event_type == "LogPlayerTakeDamage") # subset with only records of players taking damage
+match_dmg <- group_by(dmg, victim.teamId) %>%
+  summarise(sum_dmg = sum(damage)) # sum all damage taken for each team in that match
+incremental_match_dmg <- bind_rows(incremental_match_dmg, match_dmg) # add to existing dataframe of teams' damage taken in each match
+return(incremental_match_dmg)
+}
+
+url2 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/04/22/34/c4ea5a68-6ebc-11e9-ab88-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url2, phase2_dmg)
+str(phase2_dmg)
+
+url3 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/04/23/36/65ca5343-6ec5-11e9-ab88-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url3, phase2_dmg)
+
+url4 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/05/00/14/c2e838ff-6eca-11e9-ab88-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url4, phase2_dmg)
+
+url5 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/05/21/44/f7a738e2-6f7e-11e9-ab88-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url5, phase2_dmg)
+
+url6 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/05/22/26/c3a39e28-6f84-11e9-ab88-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url6, phase2_dmg)
+
+url7 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/05/23/26/3ac95165-6f8d-11e9-ab88-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url7, phase2_dmg)
+
+url8 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/06/00/07/dfdb651a-6f92-11e9-ab88-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url8, phase2_dmg)
+
+url9 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/11/21/43/df01ebc1-7435-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url9, phase2_dmg)
+
+url10 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/11/22/24/936502cc-743b-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url10, phase2_dmg)
+
+url11 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/11/23/24/e53ee938-7443-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url11, phase2_dmg)
+
+url12 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/12/00/06/d185e2c4-7449-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url12, phase2_dmg)
+
+url13 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/12/21/43/02ee7c2a-74ff-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url13, phase2_dmg)
+
+url14 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/12/22/24/b959f327-7504-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url14, phase2_dmg)
+
+url15 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/12/23/26/4da6f9dd-750d-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url15, phase2_dmg)
+
+url16 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/13/00/07/0ad5b707-7513-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url16, phase2_dmg)
+
+url17 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/18/21/52/44dc673a-79b7-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url17, phase2_dmg)
+
+url18 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/18/22/34/282bfc58-79bd-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url18, phase2_dmg)
+
+url19 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/18/23/37/e0a81267-79c5-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url19, phase2_dmg)
+
+url20 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/19/00/21/10b8c652-79cc-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url20, phase2_dmg)
+
+url21 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/19/21/46/9904c6da-7a7f-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url21, phase2_dmg)
+
+url22 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/19/22/30/ac873557-7a85-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url22, phase2_dmg)
+
+url23 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/19/23/33/806e6e3f-7a8e-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url23, phase2_dmg)
+
+url24 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/05/20/00/13/28c2593a-7a94-11e9-a9f1-0a586465861c-telemetry.json"
+phase2_dmg <- sum.dmg.function(url24, phase2_dmg)
+
+url25 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/06/01/21/49/3314fd0e-84b7-11e9-910c-0a5864666c0b-telemetry.json"
+phase2_dmg <- sum.dmg.function(url25, phase2_dmg)
+
+url26 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/06/01/22/34/70acf7a7-84bd-11e9-910c-0a5864666c0b-telemetry.json"
+phase2_dmg <- sum.dmg.function(url26, phase2_dmg)
+
+url27 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/06/01/23/37/3b6e5d84-84c6-11e9-910c-0a5864666c0b-telemetry.json"
+phase2_dmg <- sum.dmg.function(url27, phase2_dmg)
+
+url28 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/06/02/00/19/214b153f-84cc-11e9-910c-0a5864666c0b-telemetry.json"
+phase2_dmg <- sum.dmg.function(url28, phase2_dmg)
+
+url29 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/06/02/21/54/fe8f9b12-8580-11e9-910c-0a5864666c0b-telemetry.json"
+phase2_dmg <- sum.dmg.function(url29, phase2_dmg)
+
+url30 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/06/02/22/38/30863940-8587-11e9-910c-0a5864666c0b-telemetry.json"
+phase2_dmg <- sum.dmg.function(url30, phase2_dmg)
+
+url31 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/06/02/23/39/a4f2c83d-858f-11e9-910c-0a5864666c0b-telemetry.json"
+phase2_dmg <- sum.dmg.function(url31, phase2_dmg)
+
+url32 <- "https://telemetry-cdn.playbattlegrounds.com/bluehole-pubg/pc-tournament/2019/06/03/00/17/036f9881-8595-11e9-910c-0a5864666c0b-telemetry.json"
+phase2_dmg <- sum.dmg.function(url32, phase2_dmg)
+str(phase2_dmg)
+
+phase2_dmg_sum <- group_by(phase2_dmg, victim.teamId) %>%
+  summarise(dmg_taken = sum(sum_dmg))
+str(phase2_dmg_sum)
+
+# convert team ID numbers to team names
+# i checked that team IDs were the same from match to match
+
+lookup <- c("1" = "TS", "2" = "C9", "3" = "NV", "4" = "LZR", "5" = "SSG", "6" = "WC", "7" = "DNL", "8" = "GG", "9" = "END", "10" = "SIM", "11" = "P1E", "12" = "BMG", "13" = "EXG", "14" = "EU", "15" = "PEC", "16" = "RUM")
+phase2_dmg_sum <- phase2_dmg_sum %>% rename(team = "victim.teamId") %>% 
+   mutate(team = lookup[as.character(team)])
+str(phase2_dmg_sum)
+
+# add damage generated by each team to this dataframe
+phase2_dmg_sum <- phase2_dmg_sum %>% add_column(dmg_done = c(23250, 29266, 26062, 23369, 28349, 21314, 19679, 29819, 22113, 21332, 26044, 14346, 20468, 22579, 16246, 25324))
+# from https://i.redd.it/bn7qpu11l1231.png
+# probably could have repeated this whole rigmarole to extract this data from the api myself BUT
+
+# add calculated fields for avg damage taken and generated per game over 32 games
+# using number of games in phase2_dmg so this can be reproduced later
+num_games <- length(phase2_dmg$sum_dmg)/16
+phase2_dmg_sum <- phase2_dmg_sum %>% mutate(avg_dmg_done = dmg_done/num_games) %>%
+   mutate(avg_dmg_taken = dmg_taken/num_games)
+
+# arrange in alphabetical order to match other summary data and make plot setup easier
+phase2_dmg_sum <- phase2_dmg_sum %>% arrange(team)
+
+```
+
+``` {r playstyle_plots, echo = FALSE, results = "hide", fig.height = 7, fig.width = 7.5}
+
+p <- ggplot(phase2_dmg_sum, aes(x = avg_dmg_done, 
+                                y = avg_dmg_taken)) +
+   xlab("Damage Output per Match") +
+   ylab("Damage Taken per Match (Inverted)") +
+   scale_y_reverse(limit = c(2*mean(phase2_dmg_sum$avg_dmg_taken) - 625,
+                                625),
+                   expand = c(0,0)) +
+   scale_x_continuous(limit = c(448,
+                                2*mean(phase2_dmg_sum$avg_dmg_done) - 448),
+                      expand = c(0,0)) +
+   geom_vline(xintercept = mean(phase2_dmg_sum$avg_dmg_done),
+              size = 0.5,
+              color = "gray90") +
+   geom_hline(yintercept = mean(phase2_dmg_sum$avg_dmg_taken),
+              size = 0.5,
+              color = "gray90") +
+   stat_smooth(method = "lm", fullrange = TRUE,
+               col = "black", fill = "gray95",
+               size = 0.5, na.rm = TRUE) +
+   geom_text(aes(x = avg_dmg_done,
+                 y = avg_dmg_taken,
+                 label = team,
+                 family = "Helvetica",
+                 fontface = "bold"),
+             color = team_colors,
+             size = 3.8,
+             hjust = "left",
+             nudge_x = 10) +
+   theme_bw() +
+   theme(axis.title.y = element_text(margin = margin(r = 20)), 
+         axis.title.x = element_text(margin = margin(t = 20)),
+         text = element_text(family = "Helvetica"),
+         panel.grid.major = element_blank(),
+         panel.grid.minor = element_blank())
+
+# set placement of corner labels
+annotations <- data.frame(
+        xpos = c(-Inf, -Inf, Inf, Inf), # left, left, right, right
+        ypos = c(-Inf, Inf, -Inf, Inf), # up, down, up, down (on inverted axis)
+        annotateText = c("PASSIVE","YIKES ZONE",
+                        "IDEAL",
+                        "AGGRESSIVE"),
+        # order: upper left, lower left, upper right, lower right
+        hjustvar <- c(-0.35, -0.23, 1.45, 1.22), 
+        vjustvar <- c(3, -2.1, 3, -2.1))
+
+# add corner labels
+p + geom_text(data = annotations,
+              aes(x = xpos, y = ypos,
+                  label = annotateText,
+                  family = "Helvetica"),
+              color = "gray80",
+              size = 3.1,
+              hjust = hjustvar,
+              vjust = vjustvar)
+
+```
+^*Figure 2: Comparison of damage output and damage taken per match for each NPL team, as of Phase 2, Week 4. Teams that are above the black line took less damage than expected based on how aggressively they played, and teams below the line took more damage than expected.*^
+
+&#x200B;
+
+In this plot, the x-axis is the average amount of **damage a team puts out in a match**, and the y-axis is the average amount of **damage they take from other teams**, flipped around so the “good” end is at the top of the graph. 
+
+These metrics – damage output and damage taken – very roughly correspond to offensive and defensive skill. There are a lot of other variables I’d consider if I was trying to turn this into a predictive model for team evaluation (for example, how much of this damage comes from kill stealing, and is kill stealing really a repeatable skill?), but I’m not doing that just yet!
+
+Teams with **high offensive and defensive skill can be found on the top right**, and teams who are not doing as well as other teams in either aspect are on the bottom left.
+
+The horizontal line is the average damage taken per match, 875.4; the vertical line is the average damage output, 721.8.
+
+The line running diagonally through the graph is the linear model of the relationship between these variables – the **expected amount of damage taken based on how much damage is dealt by a team, i.e. how aggressively they play**. Teams that are above this line are performing better than expected, relative to the other teams. Teams below this line are underperforming.
+
+&#x200B;
+
+**TAKEAWAYS**
+
+&#x200B;
+
+Based on the linear model of the relationship between damage dealt and damage taken, there is a **consistent cost associated with more aggressive play**, but it’s much less than 1:1 for most teams, and not every team falls into that trap.
+
+**Teams on the passive side tend to be performing worse in the standings.**
+
+**Rumblers really stand out** here again. They take very little damage relative to other teams, and their damage output is very high.
+
+Spacestation is a serious outlier. Their damage output comes at a high defensive cost.
+
+There’s an interesting spread in damage per match, with some teams dealing almost double what others are doing. 
+
+Envy and eUnited do well by this metric, with high damage output and relatively low damage taken, but are middle-of-the-pack in terms of overall points. Is this really a case of skill not translating well to points in the standings, or is something else going on? I’m not sure. 
+
+Keep in mind that damage taken and damage output might both be skewed by time alive, because teams aren’t taking damage when they’re dead. Going back to hockey, as I always do, a better way of evaluating this might have been to translate damage per game to a sort of p/60 – damage taken per half hour alive rather than per game played – but I didn’t have time to get to that this week.
+
+Overall, this was a surprisingly tough exercise in learning how to use the PUBG API. I’d never tried to work with json files in R before, and it was pretty difficult to transform 32 nested lists of lists, each 16 million lines long, into a workable dataframe, even when I cut it down just to the parts I was interested in. This should be a challenge when I move onto other things like survival analysis, but this was a good start.
+
+I also want to mention [Micah Blake McCurdy’s work](https://hockeyviz.com/) again, because this week’s analysis is very inspired by his shots for/shots against charts. 
+
+The data I recorded and used is [here](https://pubgdataviz.netlify.com/post/Public_Data), and my .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-06-07-aggressive-passive-teams), for those of you who are interested.
+
+&#x200B;
+
+**tl;dr "Passive" play doesn't seem to pay off. Rumblers manage to deal a lot of damage while avoiding the costs of playing aggressively, Spacestation pays a high price for their high damage, and Pecadores are the most passive team. Rumblers, Spacestation, and Endemic are outperforming their circle favor this week.**
