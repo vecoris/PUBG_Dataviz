@@ -21,7 +21,7 @@ library(httr)
 library(jsonlite)
 library(tibble)
 
-# below you will find the gory R code of a biologist, proceed with caution
+# below you will find the gory R code of a biologist; proceed with caution
 
 ```
 &#x200B;
@@ -35,8 +35,6 @@ Let’s take a look at the old plot first.
 &#x200B;
 
 **WEEK 4 "LUCK" PLOT**
-
-&#x200B;
 
 ```{r luck_overview, include = FALSE}
 
@@ -191,7 +189,7 @@ If you’ve seen my posts before, you know what this plot shows. A breakdown by 
 
 Shoutout to **Rumblers, Spacestation, and Endemic, who are really outperforming their luck.** Wildcard and Denial seem to be trending in the wrong direction this week.
 
-I tweaked this plot a bit this week, based on my work [last week](https://pubgdataviz.netlify.com/post/2019-05-31-how-many-points-for-each-circle/). The proportion of favorable circles on the x-axis here is still the fraction of circles that landed on a team out of all the circles they were alive for, but what’s new is that I calculated this solely based on circles 3, 4, 5, 6, and 9, which are the only circles that have a significant impact on the game.
+I tweaked this plot a bit, based on my work [last week](https://pubgdataviz.netlify.com/post/2019-05-31-how-many-points-for-each-circle/). The proportion of favorable circles on the x-axis here is still the fraction of circles that landed on a team out of all the circles the team was alive for, but what’s new is that I calculated this solely based on circles 3, 4, 5, 6, and 9, which are the only circles that have a significant impact on the game.
 This new measure of circle favor explains 18% of variance in match results (R^2^ = 0.1771, p < 1x10^-15^).
 
 Moving forward, my goal is to try to create models of team performance that incorporate more than just circle favor, because it’s really not the be-all and end-all of team evaluation, as many people have mentioned. But in order to do that, I need to get better at using the PUBG API, so this week I worked on a simpler question.
@@ -432,15 +430,15 @@ p + geom_text(data = annotations,
 
 &#x200B;
 
-In this plot, the x-axis is the average amount of **damage a team puts out in a match**, and the y-axis is the average amount of **damage they take from other teams**, flipped around so the “good” end is at the top of the graph. 
+In this plot, the x-axis is the average amount of **damage a team puts out** in a match, and the y-axis is the average amount of **damage they take from other teams** in a match, flipped around so the “good” end is at the top of the graph. 
 
-These metrics – damage output and damage taken – very roughly correspond to offensive and defensive skill. There are a lot of other variables I’d consider if I was trying to turn this into a predictive model for team evaluation (for example, how much of this damage comes from kill stealing, and is kill stealing really a repeatable skill?), but I’m not doing that just yet!
+These metrics – damage output and damage taken – very roughly correspond to offensive and defensive skill.
 
 Teams with **high offensive and defensive skill can be found on the top right**, and teams who are not doing as well as other teams in either aspect are on the bottom left.
 
 The horizontal line is the average damage taken per match, 875.4; the vertical line is the average damage output, 721.8.
 
-The line running diagonally through the graph is the linear model of the relationship between these variables – the **expected amount of damage taken based on how much damage is dealt by a team, i.e. how aggressively they play**. Teams that are above this line are performing better than expected, relative to the other teams. Teams below this line are underperforming.
+The line running diagonally through the graph is the linear model of the relationship between these variables – the **expected amount of damage taken based on how much damage is dealt by a team**. Teams that are above this line are performing better than expected, relative to the other teams; they're playing aggressively, but they're not paying for it too much. Teams below this line are underperforming. The gray is the 95% confidence interval of the linear model – it's really only useful in that we can be pretty sure that there's a positive relationship between damage dealt and damage taken.
 
 &#x200B;
 
@@ -448,25 +446,25 @@ The line running diagonally through the graph is the linear model of the relatio
 
 &#x200B;
 
-Based on the linear model of the relationship between damage dealt and damage taken, there is a **consistent cost associated with more aggressive play**, but it’s much less than 1:1 for most teams, and not every team falls into that trap.
+Based on the linear model of the relationship between damage dealt and damage taken, there is a **consistent cost associated with more aggressive play**, but it’s much less than 1:1, and not every team falls into that trap.
 
 **Teams on the passive side tend to be performing worse in the standings.**
 
 **Rumblers really stand out** here again. They take very little damage relative to other teams, and their damage output is very high.
 
-Spacestation is a serious outlier. Their damage output comes at a high defensive cost.
+**Spacestation is a serious outlier.** Their damage output comes at a high defensive cost.
 
-There’s an interesting spread in damage per match, with some teams dealing almost double what others are doing. 
+There’s an interesting spread in damage output per match, with some teams dealing almost double what others are doing. 
 
 Envy and eUnited do well by this metric, with high damage output and relatively low damage taken, but are middle-of-the-pack in terms of overall points. Is this really a case of skill not translating well to points in the standings, or is something else going on? I’m not sure. 
 
-Keep in mind that damage taken and damage output might both be skewed by time alive, because teams aren’t taking damage when they’re dead. Going back to hockey, as I always do, a better way of evaluating this might have been to translate damage per game to a sort of p/60 – damage taken per half hour alive rather than per game played – but I didn’t have time to get to that this week.
+Keep in mind that damage taken and damage output might both be biased by time alive, because teams aren’t taking damage when they’re dead. Going back to hockey, as I always do, a better way of evaluating this might have been to translate damage per game to a sort of p/60 – damage dealt or taken per half hour alive rather than per game played – but I didn’t have time to get to that this week.
 
-Overall, this was a surprisingly tough exercise in learning how to use the PUBG API. I’d never tried to work with json files in R before, and it was pretty difficult to transform 32 nested lists of lists, each 16 million lines long, into a workable dataframe, even when I cut it down just to the parts I was interested in. This should be a challenge when I move onto other things like survival analysis, but this was a good start.
+Overall, this was a surprisingly tough exercise in learning how to use the PUBG API. I’d never tried to work with json files in R before, and it was pretty difficult to transform 32 nested lists of lists, each 16 million lines long, into a workable dataframe, even when I cut it down just to the parts I was interested in. It should be a challenge when I move onto other things like survival analysis, but this was a good start.
 
 I also want to mention [Micah Blake McCurdy’s work](https://hockeyviz.com/) again, because this week’s analysis is very inspired by his shots for/shots against charts. 
 
-The data I recorded and used is [here](https://pubgdataviz.netlify.com/post/Public_Data), and my .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-06-07-aggressive-passive-teams), for those of you who are interested.
+The data I recorded and used is [here](https://pubgdataviz.netlify.com/post/Public_Data), and my .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-06-07-aggressive-passive-teams.Rmd), for those of you who are interested.
 
 &#x200B;
 
