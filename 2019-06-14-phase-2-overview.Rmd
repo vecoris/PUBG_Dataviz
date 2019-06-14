@@ -476,7 +476,7 @@ At the top of the standings, Tempo outperformed C9 for most of the phase, but th
 
 In the lower end of the standings, Excelerate had an impressive continous climb, while Wildcard dipped down slowly.
 
-The overall results are grouped in four distinct clusters, and are **very close overall**, especially at the top. 
+The end results are grouped in four distinct clusters, and are **very close overall**, especially at the top. 
 
 Were the results much closer this phase than last? What did the points spread look like last phase in comparison? **Next week, I’ll be looking into parity**, which is a bit more complicated to analyze for this game than I first thought.
 
