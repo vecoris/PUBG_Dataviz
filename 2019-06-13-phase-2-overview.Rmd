@@ -1,0 +1,488 @@
+---
+title: "A Look Back at NPL Phase 2"
+author: "u/firstoverall"
+date: 2019-06-14
+categories: ["NPL", "PUBG"]
+tags: ["NPL", "PUBG", "Phase 2"]
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(collapse = TRUE)
+library(here)
+library(knitr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(ggthemes)
+library(viridis)
+library(magrittr)
+library(httr)
+library(jsonlite)
+library(tibble)
+library(plotly)
+library(transformr)
+library(units)
+library(sf) # don't install from source
+library(gganimate)
+
+Sys.setenv("plotly_username" = "descent")
+Sys.setenv("plotly_api_key" = "KOJaKam6unaHMsBRocxh")
+Sys.setenv(TZ = "MST")
+
+# below you will find the gory R code of a biologist; proceed with caution
+
+```
+&#x200B;
+
+Now that NPL Phase 2 is over, let's take a look back. **How well did each team do throughout the phase?**
+
+To be honest, I forgot that it would be over after 40 matches, and now I have to entertain myself until Stockholm. Luckily, I’ve taken on yet another question that I thought was simple and turned out not to be – stay tuned for next week.
+
+First, here’s **how each team performed based on their circle favor** in the final week of NPL Phase 2. 
+
+&#x200B;
+
+**FINAL PHASE 2 "LUCK" PLOT**
+
+&#x200B;
+
+```{r luck_overview, include = FALSE}
+
+# read in the .csv
+luckloc <- here("static", "NPL_CircleFavor_Phase2_Week5.csv") 
+luck <- read.csv(luckloc)
+
+# quick plot overview of the circle favor vs points data
+plot(luck$circle_favor_proportion, luck$total_points)
+abline(lm(luck$total_points ~ luck$circle_favor_proportion))
+
+# circles with significant impact on points only
+plot(luck$X34569_favor_proportion, luck$total_points)
+abline(lm(luck$total_points ~ luck$X34569_favor_proportion))
+
+# are they still correlated?
+cor.test(luck$circle_favor_proportion, luck$total_points) # yes, 0.25
+cor.test(luck$X34569_favor_proportion, luck$total_points) # yes, 0.39
+
+# does the circle still have an effect? 
+summary(lm(luck$total_points ~ luck$circle_favor_proportion)) # yes (explains 5.9% of variance, still significant to p < 1x10^-9)
+summary(lm(luck$total_points ~ luck$X34569_favor_proportion)) # yes (explains 15.4% of variance, still significant to p < 1x10^-15)
+
+```
+
+``` {r sig_luck_plot, echo = FALSE, message = FALSE, results = 'hide', fig.keep = 'all', fig.height = 7, fig.width = 7.5}
+
+# issue with matching up stems from mean of points per match not removing the same NA as circle favor proportion
+# solution is to take mean of points per match from the subset with no NA in cfp
+no_cfp_na_luck <- filter(luck, !is.na(X34569_favor_proportion))
+str(no_cfp_na_luck)
+# checking that this yields the correct number of values
+v1 <-  luck$X34569_favor_proportion
+length(v1[!is.na(v1)])
+
+# find the average of all match results for each team by grouping with dplyr
+summary_luck <- group_by(luck, team)
+summary_luck <- summarise(summary_luck, 
+                       mean_X34569_favor = mean(X34569_favor_proportion,
+                                                 na.rm = TRUE),
+                       mean_placement_points = mean(placement_points),
+                       mean_kill_points = mean(kill_points),
+                       mean_points = mean(total_points),
+                       mean_wins = mean(wins))
+str(summary_luck)
+
+# to create trend traces, first create a similarly grouped subset with data up to last week (this will be a rolling window)
+luck_week4 <- filter(luck, match < 33)
+str(luck_week4)
+summary_luck_week4 <- group_by(luck_week4, team)
+summary_luck_week4 <- summarise(summary_luck_week4, 
+                          mean_X34569_favor = mean(X34569_favor_proportion,
+                                                 na.rm = TRUE),
+                          mean_placement_points = mean(placement_points),
+                          mean_kill_points = mean(kill_points),
+                          mean_points = mean(total_points),
+                          mean_wins = mean(wins))
+str(summary_luck_week4)
+
+# create custom vector of team colors
+team_colors <- c("turquoise3","deepskyblue","palegreen3","darkred",
+                 "gray50","black","deeppink","midnightblue",
+                 "slateblue2","firebrick3","forestgreen","darkorange1",
+                 "blue3","darkgoldenrod2","cornflowerblue","salmon")
+
+# create base plot of match points vs circle favor, constraining axes to centre the data
+# expanding plot area to extrapolate linear model
+p <- ggplot(summary_luck, aes(x = mean_X34569_favor, 
+                                y = mean_points)) +
+  xlab("Proportion of Favorable Circles") +
+  ylab("Points per Match") +
+  scale_y_continuous(limit = c(0, 9),
+                    expand = c(0, 0)) +
+  scale_x_continuous(limit = c(0, 0.7),
+                    expand = c(0, 0)) +
+  coord_cartesian(xlim = c(0.24,
+                           (2 * mean(luck$X34569_favor_proportion,
+                                            na.rm = TRUE)) - 0.24),
+                  ylim = c(3.15,
+                           (2 * mean(luck$total_points)) - 3.15)) +
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# add vertical line with mean circle favor
+p <- p + geom_vline(xintercept = mean(luck$X34569_favor_proportion, 
+                                na.rm = TRUE),
+              size = 0.3,
+              color = "gray80")
+
+# add horizontal line with mean match points
+p <- p + geom_hline(yintercept = mean(luck$total_points),
+              size = 0.3,
+              color = "gray80")
+
+# add linear model of relationship between match points and circle favor
+p <- p + stat_smooth(method = "lm", fullrange = TRUE,
+               col = "black", fill = NA,
+               size = 0.3, na.rm = TRUE)
+
+# add 1/2 standard deviation guides
+# first, find the intercept of the linear model to create 1/2 standard deviation guides
+luck_model <- lm(no_cfp_na_luck$total_points ~ no_cfp_na_luck$X34569_favor_proportion)
+luck_intercept <- coef(luck_model)[1]
+
+# create intercepts and slopes for 1/2 standard deviation guides
+upper_sd_intercept <- luck_intercept + sd(no_cfp_na_luck$total_points)/2 - 0.109815
+lower_sd_intercept <- luck_intercept - sd(no_cfp_na_luck$total_points)/2 - 0.109815
+sd_slope <- coef(luck_model)[2]
+
+# add standard deviation guides to the plot
+p <- p + geom_abline(intercept = upper_sd_intercept, 
+                     slope = sd_slope, 
+                     col = "gray80", 
+                     size = 0.3) +
+  geom_abline(intercept = lower_sd_intercept, 
+                     slope = sd_slope, 
+                     col = "gray80", 
+                     size = 0.3)
+
+# add team acronyms to the plot
+p <-  p + geom_text_repel(aes(x = mean_X34569_favor,
+                 y = mean_points,
+                 label = team,
+                 family = "Helvetica",
+                 fontface = "bold"),
+             color = team_colors,
+             size = 4.3,
+             force = 0.0005)
+
+# add trend traces from week 3 to week 4 to the plot
+p <- p + geom_segment(aes(x = summary_luck_week4$mean_X34569_favor,
+                             y = summary_luck_week4$mean_points,
+                             xend = summary_luck$mean_X34569_favor,
+                             yend = summary_luck$mean_points),
+                      col = team_colors, 
+                      lty = "dotted")
+
+# set placement of corner labels
+annotations <- data.frame(
+        xpos = c(-Inf, -Inf, Inf, Inf), # left, left, right, right
+        ypos = c(Inf, -Inf, Inf, -Inf), # up, down, up, down
+        annotateText = c("DEFYING FATE",
+                         "CAN'T BLAME EM",
+                         "#BLESSED",
+                         "YIKES ZONE"),
+        # order: upper left, lower left, upper right, lower right
+        hjustvar <- c(-0.25, -0.25, 1.3, 1.25), 
+        vjustvar <- c(3.25, -2, 3.25, -2))
+        
+# add corner labels to the plot
+p <- p + geom_text(data = annotations,
+              aes(x = xpos, y = ypos,
+                  label = annotateText,
+                  family = "Helvetica"),
+              color = "gray80",
+              size = 3.5,
+              hjust = hjustvar,
+              vjust = vjustvar)
+
+suppressWarnings(print(p))
+
+```
+
+^*Figure 1: Total points per match for each NPL team based on circle favor, as of Phase 2, Week 5. Teams that are above the black line performed better than expected, and teams below the line, worse. The gray lines represent one half standard deviation from the mean in points per match. The dotted trace represents the change in performance from Week 4 to Week 5.*^
+
+&#x200B;
+
+A breakdown by kill points and placement points can be found [here](https://pubgdataviz.netlify.com/post/Phase2_Week5_Luck_Plots/).
+
+**Ghost, Tempo, and C9** all made a huge push towards the end – C9 improved despite losing a bit of circle favor, although the difference in circle favor between those three teams is fairly minute. 
+
+Rumblers and P1E fell off slightly, even though they were fighting for top spots, as did Endemic, who did well last week. **Rumblers and Spacestation continued to outperform their luck by the highest margin of all teams.**
+
+&#x200B;
+
+**“LUCK” PLOTS OVER TIME**
+
+&#x200B;
+
+To see **each team's progression over Phase 2** relative to their luck and relative to other teams, I created an animation of each week's plots to show trends over time.
+
+&#x200B;
+
+``` {r sig_luck_plot_animation, echo = FALSE, message = FALSE, results = 'hide', fig.keep = 'all', fig.height = 7, fig.width = 7.5, fig.show = "animate", animation.hook = knitr::hook_gifski}
+
+# create animated plot showing change week to week
+# start by creating dataframe of weekly cumulative average points
+# week 5
+animation <- group_by(luck, team)
+animation <- animation %>% 
+  summarise(favor = mean(X34569_favor_proportion, na.rm = TRUE),
+            points = mean(total_points)) %>%
+  mutate (week = 5)
+str(animation)
+
+# week 4
+animation4 <- filter(luck, match %in% c(0:32))
+animation4 <- animation4 %>%
+  group_by(team) %>% 
+  summarise(favor = mean(X34569_favor_proportion, na.rm = TRUE),
+            points = mean(total_points)) %>%
+  mutate (week = 4)
+animation <- bind_rows(animation, animation4) # add to growing dataframe
+
+# week 3
+animation3 <- filter(luck, match %in% c(0:24))
+animation3 <- animation3 %>%
+  group_by(team) %>% 
+  summarise(favor = mean(X34569_favor_proportion, na.rm = TRUE),
+            points = mean(total_points)) %>%
+  mutate (week = 3)
+animation <- bind_rows(animation, animation3)
+
+# week 2
+animation2 <- filter(luck, match %in% c(0:16))
+animation2 <- animation2 %>%
+  group_by(team) %>% 
+  summarise(favor = mean(X34569_favor_proportion, na.rm = TRUE),
+            points = mean(total_points)) %>%
+  mutate (week = 2)
+animation <- bind_rows(animation, animation2)
+
+# week 1
+animation1 <- filter(luck, match %in% c(0:8))
+animation1 <- animation1 %>%
+  group_by(team) %>% 
+  summarise(favor = mean(X34569_favor_proportion, na.rm = TRUE),
+            points = mean(total_points)) %>%
+  mutate (week = 1)
+animation <- bind_rows(animation, animation1)
+
+# create custom vector of team colors
+team_colors <- c("turquoise3","deepskyblue","palegreen3","darkred",
+                 "gray50","black","deeppink","midnightblue",
+                 "slateblue2","firebrick3","forestgreen","darkorange1",
+                 "blue3","darkgoldenrod2","cornflowerblue","salmon")
+
+# create animated plot showing change week to week
+p <- ggplot(animation, aes(x = favor,
+                           y = points)) +
+  xlab("Proportion of Favorable Circles") +
+  ylab("Cumulative Average Points per Match") +
+  scale_y_continuous(limit = c(0, 10),
+                     expand = c(0, 0)) +
+  scale_x_continuous(limit = c(0, 1),
+                     expand = c(0, 0)) +
+  coord_cartesian(xlim = c(0.1,
+                           (2 * mean(luck$X34569_favor_proportion,
+                                            na.rm = TRUE)) - 0.1),
+                  ylim = c(2.3,
+                           (2 * mean(luck$total_points)) - 2.3)) +
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# add vertical line with mean circle favor
+p <- p + geom_vline(xintercept = mean(luck$X34569_favor_proportion, 
+                                na.rm = TRUE),
+              size = 0.3,
+              color = "gray80")
+
+# add horizontal line with mean match points
+p <- p + geom_hline(yintercept = mean(luck$total_points),
+              size = 0.3,
+              color = "gray80")
+
+# add standard deviation guides
+# first, find the intercept of the linear model to create standard deviation guides
+luck_model <- lm(no_cfp_na_luck$total_points ~ no_cfp_na_luck$X34569_favor_proportion)
+luck_intercept <- coef(luck_model)[1]
+
+# add linear model of relationship between match points and circle favor
+p <- p + geom_abline(slope = coef(luck_model)[2],
+                     intercept = coef(luck_model)[1] - 0.109815,
+                     size = 0.3,
+                     col = "black")
+
+# create intercepts and slopes for standard deviation guides
+upper_sd_intercept <- luck_intercept + sd(no_cfp_na_luck$total_points) - 0.109815
+lower_sd_intercept <- luck_intercept - sd(no_cfp_na_luck$total_points) - 0.109815
+sd_slope <- coef(luck_model)[2]
+
+# add standard deviation guides to the plot
+p <- p + geom_abline(intercept = upper_sd_intercept, 
+                     slope = sd_slope, 
+                     col = "gray80", 
+                     size = 0.3) +
+  geom_abline(intercept = lower_sd_intercept, 
+                     slope = sd_slope, 
+                     col = "gray80", 
+                     size = 0.3)
+
+# set placement of corner labels
+annotations <- data.frame(
+        xpos = c(-Inf, -Inf, Inf, Inf), # left, left, right, right
+        ypos = c(Inf, -Inf, Inf, -Inf), # up, down, up, down
+        annotateText = c("DEFYING FATE",
+                         "CAN'T BLAME EM",
+                         "#BLESSED",
+                         "YIKES ZONE"),
+        # order: upper left, lower left, upper right, lower right
+        hjustvar <- c(-0.25, -0.21, 1.3, 1.25), 
+        vjustvar <- c(3.25, -2.25, 3.25, -2.25))
+        
+# add corner labels to the plot
+p <- p + geom_text(data = annotations,
+              aes(x = xpos, y = ypos,
+                  label = annotateText,
+                  family = "Helvetica"),
+              color = "gray80",
+              size = 3.5,
+              hjust = hjustvar,
+              vjust = vjustvar)
+
+# add team acronyms to the plot
+p <-  p + geom_text(aes(x = favor,
+                              y = points,
+                              label = team,
+                              colour = team,
+                              family = "Helvetica",
+                              fontface = "bold"),
+                          size = 4.3) +
+  scale_colour_manual(values = team_colors) +
+  theme(legend.position = "none")
+
+# make this suitable for gganimate
+anim <- p + 
+  transition_states(week,
+                    transition_length = 30,
+                    state_length = 2) +
+  labs(title = 'Week: {closest_state}')
+
+# animate(anim, width = 2500, height = 2500, res = 330)
+
+```
+
+![](https://u.teknik.io/DwkJh.gif)
+
+^*Figure 2: Animation of change in average points per match for each NPL team based on circle favor over the course of Phase 2. Teams that are above the black line performed better than expected, and teams below the line, worse. The gray lines represent one half standard deviation from the mean in points per match.*^
+
+&#x200B;
+
+If you **follow the path of one team you're interested in**, you can see their whole record throughout the phase. Ghost seems to have continuously improved, while Wildcard went from average to below average. eUnited started strong and regressed to the mean, and Simplicity did the opposite.
+
+All the observations tended towards the centre over time, but there was still a surprising spread in average circle favor at the end of week 5. One way to confirm the influence of skill or playstyle on this measure of "luck" would be to see how this spread shrinks over many more matches. If the spread in circle favor basically trends to 0 (all teams clustered at the mean), then it truly is all luck, but if it stays spread out, then it's strongly affected by differences in how teams are playing.
+
+&#x200B;
+
+**TRENDS IN THE STANDINGS**
+
+&#x200B;
+
+I was interested in plotting trends in team performance over phase 2, so I made an interactive tool to look at each team’s results over time. 
+
+Hover over the lines in the plotly visualization below to see details for each team in each match. Double click on a team name in the legend to isolate their trendline, and single click to add or remove other teams’ trendlines to compare. Double click again or press the home button in the upper right to restore the plot to defaults. Zoom out with the controls in the upper right to see Smokin' Aces (then Denial) start the phase off with a bang.
+
+&#x200B;
+
+``` {r time_series, echo = FALSE, message = FALSE, fig.keep = 'all', fig.height = 6, fig.width = 8}
+
+luck2 <- mutate(luck, ongoing_avg_points = cumulative_points/match)
+
+luck2$team <- factor(luck2$team, levels = c("TS", "C9", "GG", "RUM", "SSG", "P1E", "LZR", "EU", "NV", "END", "EXG", "SIM", "WC", "BMG", "SA", "PEC"))
+team_colors <- c("cornflowerblue", "deepskyblue", "black", "forestgreen",
+                 "darkgoldenrod2", "slateblue2", "deeppink", "darkred",
+                 "midnightblue", "palegreen3", "gray50", "blue3",
+                 "salmon", "turquoise3", "darkorange1", "firebrick3")
+
+p <- ggplot(luck2,
+       aes(x = match, 
+           y = ongoing_avg_points,
+           colour = team,
+           group = team,
+           text = sprintf('Match: %s\nCumulative Average Points: %s\nTeam: %s', 
+                          luck2$match, 
+                          round(luck2$ongoing_avg_points, 
+                                digits = 3),
+                          luck2$team))) +
+       geom_line(size = 0.7) +
+  labs(x = "Match", 
+       y = "Cumulative Average Points per Match") +
+  scale_x_continuous(limit = c(1, 40),
+                     expand = c(0, 0)) +
+  scale_y_continuous(limit = c(0, 24),
+                     expand = c(0, 0)) +
+  coord_cartesian(xlim = c(1, 40),
+                  ylim = c(0, 12)) +
+  scale_colour_manual(values = team_colors) +
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica"),
+        legend.title = element_blank())
+
+p <- ggplotly(p, tooltip = "text") %>%
+  layout(hoverlabel = list(bgcolor = "white",
+                           font = list(family = "Helvetica",
+                                       size = 11,
+                                       color = "gray10"))) %>%
+  add_annotations(text = "Team", xref = "paper", yref = "paper",
+                  x = 1.02, xanchor = "left",
+                  y = 0.985, yanchor = "top",
+                  legendtitle = TRUE, showarrow = FALSE) %>%
+  layout(legend = list(y = 0.94, yanchor = "top"))
+
+p
+
+```
+&#x200B;
+
+^*Figure 3: Interactive plot of team performance over the course of NPL Phase 2.*^
+
+&#x200B;
+
+"Cumulative average points" refers to a team’s total standings points after a given match divided by the number of matches, incremented over the increasing number of matches as time goes on. I've used the cumulative average of points per match so the results gradually smooth out as more data informs the average. 
+
+**The relative position of each team is accurate for each day’s results**, so you can see how the standings change over time.
+
+At the top of the standings, Tempo outperformed C9 for most of the phase, but the two teams came much closer near the end, crossing over multiple times. Ghost's upward climb can be seen in this graph too. Rumblers crossed over with Tempo multiple times as well, dropping off just in the last week Spacestation moved up in the standings pretty dramatically from the first half of the phase to the second.
+
+In the lower end of the standings, Excelerate had an impressive continous climb, while Wildcard dipped down slowly.
+
+The overall results are grouped in four distinct clusters, and are very close overall, especially at the top. Were the results much closer this phase than last? What did the points spread look like last phase in comparison? **Next week, I’ll be looking into parity**, which is a bit more complicated to analyze for this game than I first thought.
+
+I've had a great time sharing my work with all of you over the past two months. Thanks for all the support.
+
+The data I recorded and used is [here](https://pubgdataviz.netlify.com/post/Public_Data), and my .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-06-13-phase-2-overview.Rmd), for those of you who are interested.
+
+
+&#x200B;
+
+**tl;dr Interactive tool to see how teams performed in Phase 2. Plus, Rumblers and Spacestation continued to outperform their luck by the highest margin of all teams, even though they both dropped off at the end.**
