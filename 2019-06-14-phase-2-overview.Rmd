@@ -396,7 +396,7 @@ anim <- p +
 
 &#x200B;
 
-If you **follow the path of one team you're interested in**, you can see their whole record throughout the phase. Ghost seems to have continuously improved, while Wildcard went from average to below average. eUnited started strong and regressed to the mean, and Simplicity did the opposite.
+If you **follow the path of one team you're interested in**, you can see their whole record throughout the phase. Ghost seems to have continuously improved, while Wildcard went from average to below average. eUnited started strong and regressed to the mean, and Simplicity did the opposite, starting weak and coming closer to expected performance.
 
 All the observations tended towards the centre over time, but there was still a surprising spread in average circle favor at the end of week 5. One way to confirm the influence of skill or playstyle on this measure of "luck" would be to see how this spread shrinks over many more matches. If the spread in circle favor basically trends to 0 (all teams clustered at the mean), then it truly is all luck, but if it stays spread out, then it's strongly affected by differences in how teams are playing.
 
@@ -468,7 +468,7 @@ p
 
 &#x200B;
 
-"Cumulative average points" refers to a team’s total standings points after a given match divided by the number of matches, incremented over the increasing number of matches as time goes on. I've used the cumulative average of points per match so the results gradually smooth out as more data informs this average.
+"Cumulative average points" refers to a team’s total standings points after a given match divided by the number of matches (average points), incremented over the increasing number of matches as time goes on (cumulatively). I've used the cumulative average of points per match so the results gradually smooth out as more data informs this average.
 
 **The relative position of each team is accurate for each day’s results**, so you can see how the standings change over time.
 
@@ -487,4 +487,4 @@ The data I recorded and used is [here](https://pubgdataviz.netlify.com/post/Publ
 
 &#x200B;
 
-**tl;dr Interactive tool to see how teams performed in Phase 2. Plus, Rumblers and Spacestation continued to outperform their luck by the highest margin of all teams, even though they both dropped off at the end.**
+**tl;dr Interactive tool to see how teams performed in Phase 2. Excelerate, Spacestation, and Ghost continually rose in the standings. Rumblers and Spacestation continued to outperform their luck by the highest margin of all teams, even though they both dropped off at the end.**
