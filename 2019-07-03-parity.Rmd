@@ -1,0 +1,679 @@
+---
+title: "Parity"
+author: "u/firstoverall"
+date: 2019-07-03
+categories: ["NPL", "PUBG"]
+tags: ["NPL", "PUBG", "Phase 2", "parity"]
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(collapse = TRUE)
+library(here)
+library(knitr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(gglorenz)
+library(ggthemes)
+library(viridis)
+library(magrittr)
+library(forcats)
+library(tibble)
+library(transformr)
+library(gridExtra)
+library(ineq)
+library(vegan)
+diversity_boot <- here("static", "CERE.RData") 
+load(diversity_boot)
+
+Sys.setenv(TZ = "MST")
+
+# below you will find the gory R code of a biologist; proceed with caution
+
+```
+&#x200B;
+
+What does trying to count the types of trees in a forest have to do with competitive PUBG? This week, I'm looking at **parity** in the NPL.
+
+Parity is the **level of fairness or competitiveness in a sports league**. If a league has high parity, teams have roughly **equivalent levels of talent**, with a small gap between the worst and best teams, and **every team has a similar chance of winning**. [Last time](https://pubgdataviz.netlify.com/post/2019-06-14-phase-2-overview/), I went back over the standings throughout NPL Phase 2, where the end results were very close.
+
+**High parity isn’t necessarily good or bad** – high parity means **games are more competitive**, and the winner can’t be easily predicted in advance, which can be more fun to watch. But in the NHL, a league with comparatively high parity among major North American sports, that means that **luck**, in the form of bad puck bounces or bizarre officiating, **[can have a lot of influence on a series](https://www.washingtonpost.com/sports/2019/06/07/officiating-gaffes-continue-plague-stanley-cup-playoffs/?utm_term=.d7febe701c2c)** – too much for some viewers. And in the NBA, a league with relatively low parity, the better team tends to win every playoffs series, which makes upsets all that much more exciting.
+
+I've seen people saying that **the second phase of the NPL was more equal than the first phase**, with more of a chance for any given team to do well, because of the influx of top teams from NPL Contenders. 
+
+**Is that true? Has parity increased from Phase 1 to Phase 2?** Were the results really that much much closer this phase than last? And **how strong is the competition in the NPL compared to other competitive PUBG leagues worldwide?**
+
+Testing these questions got away from me a bit because there are a lot of interesting analytical parallels to the way we evaluate **biodiversity** in ecology, my field of study. Let's take a detour.
+
+&#x200B;
+
+**BIODIVERSITY**
+
+&#x200B;
+
+![](https://u.teknik.io/bcykN.jpg)
+
+^*A black bear relaxing with a snow depth measurement stick in a field of labrador tea and trembling aspen, captured by a camera trap at one of my study sites in northern Alberta, Canada. Courtesy of the Alberta Biodiversity Monitoring Institute, 2018.*^
+
+&#x200B;
+
+[What is biodiversity and why do we care about it](https://www.theguardian.com/news/2018/mar/12/what-is-biodiversity-and-why-does-it-matter-to-us)? **Biodiversity is the variety of living organisms** in a given area. That area can range from your backyard to the entire planet, and biodiversity can change from place to place based on environmental conditions like temperature. Globally, biodiversity is [under threat due to human activities](https://www.nature.com/articles/d41586-019-01448-4) – I'm sure this isn't news to anyone.
+
+Ecologists are interested in biodiversity in order to answer questions like: [what are the benefits of a biodiverse world for human society?](https://www.nytimes.com/2014/06/05/science/earth/putting-a-price-tag-on-natures-defenses.html?_r=1) Or, on a smaller scale, [do food crops grow better when there are more species of pollinators around](https://www.smithsonianmag.com/science-nature/diversity-bees-good-environmentand-farmers-wallets-180951339/)? We can answer these questions by comparing measurements of biodiversity under different conditions.
+
+**These questions about analysing the complexity of different systems are the same, mathematically, as questions about parity in an esports league.**
+
+There are a few methods ecologists use to assess biodiversity, but I'm going to focus on just a few, which are also commonly used in economics and sports analytics, to find out **if NPL Phase 2 had higher parity than Phase 1**.
+
+First, I'm going to visualize parity in both phases so far using Lorenz curves.
+
+&#x200B;
+
+**LOOKING AT PARITY IN THE NPL**
+
+``` {r parity_data_setup, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# create a dataset containing the points spreads from all phases of all leagues internationally
+
+# Taiwan: Master League 2019 - Phase 1: Finals 
+# https://liquipedia.net/pubg/PUBG_Master_League/2019/Phase_1
+ML1_finals_parity <- tibble(points = c(135, 133, 122, 100,
+                                       100, 96, 94, 94,
+                                       86, 71, 66, 62,
+                                       55, 55, 45, 41),
+                            phase = "ML1") # 15 matches 
+# can't include the regular season because the league has 24 teams and a completely different format from other leagues
+# so to have a good comparison i'm using only the finals with 16 teams
+# although using the finals with only 15 matches introduces high variability with phase length... i wonder if parity is correlated with phase length (probably smh)
+
+# start the global dataset
+global_parity <- ML1_finals_parity
+
+# Taiwan: Master League 2019 - Phase 2: Finals 
+# https://liquipedia.net/pubg/PUBG_Master_League/2019/Phase_2
+# not done until July 7
+
+# AU & NZ: ESL AU & NZ Championship 2019 - Phase 1
+# https://liquipedia.net/pubg/ESL/ANZ_Championship/Phase_1
+ANZ1_parity <- tibble(points = c(386, 374, 208, 192, 
+                                    183, 173, 170, 160, 
+                                    160, 157, 137, 123, 
+                                    118, 113, 111, 101),
+                      phase = "ANZ1") # 32 matches
+global_parity <- bind_rows(global_parity, ANZ1_parity)
+
+# AU & NZ: ESL AU & NZ Championship 2019 - Phase 2
+# https://liquipedia.net/pubg/ESL/ANZ_Championship/Phase_2
+ANZ2_parity <- tibble(points = c(540, 322, 293, 263,
+                                     253, 233, 226, 214,
+                                     204, 203, 199, 197,
+                                     156, 124, 98, 90),
+                      phase = "ANZ2") # 40 matches 
+global_parity <- bind_rows(global_parity, ANZ2_parity)
+
+# PUBG Southeast Asia Championship 2019 - Phase 1
+# https://liquipedia.net/pubg/PUBG_Southeast_Asia_Championship/2019/Phase_1
+PSC1_parity <- tibble(points = c(124, 114, 103, 94, 
+                                 93, 81, 76, 76, 
+                                 51, 49, 46, 44, 
+                                 42, 37, 31, 30),
+                      phase = "PSC1") # 12 matches
+global_parity <- bind_rows(global_parity, PSC1_parity)
+
+# PUBG Southeast Asia Championship 2019 - Phase 2
+# https://liquipedia.net/pubg/PUBG_Southeast_Asia_Championship/2019/Phase_2
+PSC2_parity <- tibble(points = c(139, 104, 93, 93,
+                                 84, 64, 64, 63, 
+                                 59, 59, 57, 52,
+                                 50, 46, 38, 30),
+                      phase = "PSC2") # 12 matches
+global_parity <- bind_rows(global_parity, PSC2_parity)
+
+# PUBG Korea League 2019
+# can't include because the league has 24 teams and a completely different format from other leagues
+
+# PUBG Korea Contenders 2019 - Phase 1
+# https://liquipedia.net/pubg/PUBG_Korea_Contenders/2019/Phase_1
+PKC1_parity <- tibble(points = c(579, 395, 345, 319, 
+                                 296, 260, 251, 248, 
+                                 248, 245, 240, 219, 
+                                 205, 200, 199, 80),
+                      phase = "PKC1") # 48 matches
+global_parity <- bind_rows(global_parity, PKC1_parity)
+
+# PUBG Korea Contenders 2019 - Phase 2
+# https://liquipedia.net/pubg/PUBG_Korea_Contenders/2019/Phase_2
+# not done until July 7
+
+# ESL LA League: Season 2
+# ~ Phase 1
+# https://liquipedia.net/pubg/ESL/LA_League/Season_2
+LA1_parity <- tibble(points = c(294, 210, 194, 186, 
+                                172, 170, 166, 127, 
+                                105, 93, 88, 84, 
+                                72, 72, 57, 52),
+                     phase = "LA1") # 24 matches
+global_parity <- bind_rows(global_parity, LA1_parity)
+
+# ESL LA League: Season 3
+# ~ Phase 2
+# https://liquipedia.net/pubg/ESL/LA_League/Season_3
+LA2_parity <- tibble(points = c(209, 180, 146, 142,
+                                126, 126, 117, 112,
+                                107, 98, 94, 77,
+                                72, 63, 63, 61),
+                     phase = "LA2") # 24 matches
+global_parity <- bind_rows(global_parity, LA2_parity)
+
+# PUBG JAPAN SERIES Season 2: Grade 1 - Phase 1
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_2/Phase_1/Grade_1
+# essentially the first half of global phase 1
+PJS1_1_parity <- tibble(points = c(110, 99, 97, 88, 
+                                   79, 79, 78, 76, 
+                                   71, 64, 50, 46, 
+                                   40, 40, 36, 33),
+                        phase = "PJS1") # 12 matches
+global_parity <- bind_rows(global_parity, PJS1_1_parity)
+
+# PUBG JAPAN SERIES Season 2: Grade 1 - Phase 2
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_2/Phase_2/Grade_1
+# second half of global phase 1
+PJS1_2_parity <- tibble(points = c(103, 96, 92, 92, 
+                                   91, 84, 75, 70, 
+                                   66, 63, 54, 50, 
+                                   46, 41, 36, 29),
+                        phase = "PJS2") # 12 matches
+global_parity <- bind_rows(global_parity, PJS1_2_parity)
+
+# PUBG JAPAN SERIES Season 3: Grade 1 - Phase 1
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_3/Phase_1/Grade_1
+# first half of global phase 2
+PJS2_1_parity <- tibble(points = c(133, 108, 90, 90,
+                                   80, 68, 67, 64, 
+                                   64, 61, 56, 50,
+                                   38, 36, 35, 28),
+                        phase = "PJS3") # 12 matches
+global_parity <- bind_rows(global_parity, PJS2_1_parity)
+
+# PUBG JAPAN SERIES Season 3: Grade 1 - Phase 1
+# second half of global phase 2
+# not completed yet
+
+# PUBG JAPAN SERIES Season 2: Grade 2 - Phase 1
+# first half of global phase 1
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_2/Phase_1/Grade_2
+PJS21_1_parity <- tibble(points = c(105, 91, 89, 84, 
+                                     76, 69, 68, 68, 
+                                     67, 67, 62, 61, 
+                                     58, 44, 42, 40),
+                         phase = "PJSC1") # 12 matches
+global_parity <- bind_rows(global_parity, PJS21_1_parity)
+
+# PUBG JAPAN SERIES Season 2: Grade 2 - Phase 2
+# second half of global phase 1
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_2/Phase_2/Grade_2
+PJS21_2_parity <- tibble(points = c(138, 88, 83, 82, 
+                                     82, 80, 74, 67, 
+                                     64, 56, 52, 50, 
+                                     50, 49, 41, 30),
+                         phase = "PJSC2") # 12 matches
+global_parity <- bind_rows(global_parity, PJS21_2_parity)
+
+# PUBG JAPAN SERIES Season 3: Grade 2 - Phase 1
+# first half of global phase 2
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_3/Phase_1/Grade_2
+PJS22_1_parity <- tibble(points = c(122, 109, 91, 86, 
+                                     79, 74, 73, 61, 
+                                     61, 55, 52, 48, 
+                                     48, 43, 37, 36),
+                         phase = "PJSC3") # 12 matches
+global_parity <- bind_rows(global_parity, PJS22_1_parity)
+
+# PUBG JAPAN SERIES Season 3: Grade 2 - Phase 2
+# second half of global phase 2
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_3/Phase_2/Grade_2
+# to be completed July 12
+
+# PUBG Champions League 2019
+# Chinese league - has a round robin format with 48 teams so can't be compared
+
+# PUBG Europe League - Phase 1
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_1
+PEL1_parity <- tibble(points = c(496, 417, 390, 383, 
+                                 382, 364, 362, 340, 
+                                 337, 324, 317, 316, 
+                                 315, 294, 196, 185),
+                      phase = "PEL1") # 60 matches
+global_parity <- bind_rows(global_parity, PEL1_parity)
+
+# PUBG Europe League - Phase 2
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2
+# to be completed July 7
+
+# PUBG Europe League Contenders - Phase 1
+# https://liquipedia.net/pubg/PUBG_Contenders_League/2019/Phase_1
+PELC1_parity <- tibble(points = c(250, 216, 155, 149, 
+                                  147, 146, 146, 140, 
+                                  139, 131, 101, 98, 
+                                  93, 91, 85, 73),
+                       phase = "PELC1") # 48 matches
+global_parity <- bind_rows(global_parity, PELC1_parity)
+
+# PUBG Europe League Contenders - Phase 2
+# https://liquipedia.net/pubg/PUBG_Contenders_League/2019/Phase_2
+# to be completed July 4
+
+# National PUBG League - Phase 1
+# https://liquipedia.net/pubg/National_PUBG_League/2019/Phase_1
+NPL1_parity <- tibble(points = c(368, 299, 290, 285,
+                                 283, 232, 226, 220,
+                                 216, 211, 211, 182,
+                                 176, 142, 140, 126),
+                      phase = "NPL1") # 40 matches
+global_parity <- bind_rows(global_parity, NPL1_parity)
+
+# National PUBG League - Phase 2
+# https://liquipedia.net/pubg/National_PUBG_League/2019/Phase_2
+NPL2_parity <- tibble(points = c(296, 285, 284, 274,
+                                 273, 244, 238, 237,
+                                 235, 224, 203, 194,
+                                 192, 154, 149, 139),
+                      phase = "NPL2") # 40 matches
+global_parity <- bind_rows(global_parity, NPL2_parity)
+
+# National PUBG League: Contenders - Phase 1
+# https://liquipedia.net/pubg/National_PUBG_League/2019/Contenders/Phase_1
+NPLC1_parity <- tibble(points = c(133, 133, 122, 108, 
+                                   106, 99, 96, 92, 
+                                   89, 87, 76, 74, 
+                                   67, 61, 48), # one team disqualified
+                 phase = "NPLC1") # 32 matches
+global_parity <- bind_rows(global_parity, NPLC1_parity)
+
+# National PUBG League: Contenders - Phase 2
+# https://liquipedia.net/pubg/National_PUBG_League/2019/Contenders/Phase_2
+NPLC2_parity <- tibble(points = c(200, 125, 106, 103, 
+                                    98, 96, 90, 83, 
+                                    82, 81, 80, 73, 
+                                    71, 53, 50, 42),
+                         phase = "NPLC2") # 32 matches
+global_parity <- bind_rows(global_parity, NPLC2_parity)
+
+global_parity <- dplyr::mutate(global_parity, phase = factor(phase))
+
+```
+
+&#x200B;
+
+A **Lorenz curve is a graphical representation of inequality**, developed in 1905 by American economist Max Lorenz to illustrate unequal distributions of wealth in a country.
+
+It has a lot of uses in ecology, but for PUBG, it can be used to show **the difference between the actual distribution of points (the curve), and what the points distribution would be if all teams were exactly equal and earned the same number of points (the dotted line)**.
+
+&#x200B;
+
+``` {r lorenz_viz, echo = FALSE, results = "hide", fig.height = 6.5, fig.width = 7.5}
+
+# create a dataset with just NPL data
+NPL_parity <- bind_rows(NPL1_parity, NPL2_parity)
+
+# calculate Gini coefficient for NPL phases
+ineq(NPL1_parity$points, type = "Gini") # 0.1588404
+ineq(NPL2_parity$points, type = "Gini") # 0.1224282
+
+# visualize the difference in parity with lorenz curves
+# first for NPL only
+
+NPL_parity %<>%
+  group_by(phase) %>%
+  mutate(gini = ineq(points, type = "Gini"))
+
+lz <- NPL_parity %>%
+  ungroup() %>%
+  mutate(phase = fct_reorder(phase, gini)) %>%
+  ggplot(aes(points,
+             group = phase,
+             fill = phase,
+             colour = phase)) +
+  stat_lorenz(geom = "area", size = 0.76, alpha = 0.25) +
+  geom_abline(linetype = "dashed") +
+  scale_fill_viridis(begin = 0.1,
+                      end = 0.8,
+                      option = "plasma",
+                      direction = -1,
+                      discrete = TRUE,
+                      guide = "legend") +
+  scale_colour_viridis(begin = 0.1,
+                      end = 0.8,
+                      option = "plasma",
+                      direction = -1,
+                      discrete = TRUE,
+                      guide = "legend") +
+  scale_x_continuous(expand = c(0, 0)) + # this fills the "frame"
+  scale_y_continuous(expand = c(0, 0)) + # ditto
+  labs(x = "Cumulative Proportion of Teams in the League",
+       y = "Cumulative Proportion of Total Points",
+       fill = "\n",  # League and Phase
+       # original problem w legend not merging 
+       # was having a custom name here for fill and not colour
+       colour = "\n") + # League and Phase
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica", size = 10))
+
+lz
+
+```
+
+^*Lorenz curves for NPL Phase 1 and Phase 2.*^
+
+&#x200B;
+
+What does this graph actually show? The horizontal **x-axis is the proportion of teams** as each team is cumulatively added into the analysis – the curve goes through each team one at a time from left to right. The vertical **y-axis shows what we’re interested in – the points earned by each team out of all standings points earned by all teams**, accumulated as it goes through each team from bottom to top.
+
+For example, the point at x ≈ 0.63 and y ≈ 0.5 for Phase 1, in purple, tells us that **63% of the teams in the league earned only half of the total standings points**. Under perfect parity (along the dotted line), where each team performed equally well, those bottom 63% of teams would together have earned 63% of the points.
+
+**There isn’t a huge change between Phase 1 and Phase 2, but the curves *are* different, with Phase 2 showing slightly more parity**. The Gini coefficient, or the area between the curve and the dotted line, is `r round(ineq(NPL1_parity$points, type = "Gini"), digits = 3)` for Phase 1, and `r round(ineq(NPL2_parity$points, type = "Gini"), digits = 3)` for Phase 2 (smaller number = more parity).
+
+Unfortunately, although this shows that there is a difference in parity, and size of the difference may be small, I don't know whether or not it's significant. **I started to look at other methods of definitively answering this question**.
+
+**The standard method for evaluating parity in sports economics journals is the "relative standard deviation"** (not to be confused with the concept in statistics with the same name), **a measure of how different the actual results in a league were from the hypothetical results under a scenario where that league has complete parity** ([Cain & Haddock 2006](https://journals.sagepub.com/doi/abs/10.1177/1527002504272937), [Trandel & Maxcy 2011](https://econpapers.repec.org/article/bpjjqsprt/v_3a7_3ay_3a2011_3ai_3a1_3an_3a1.htm), [Owen 2012](https://journals.sagepub.com/doi/abs/10.1177/1527002510393738), [Lopez 2017](http://www.sloansportsconference.com/mit_news/exploring-consistency-in-professional-sports-how-the-nfls-parity-is-somewhat-of-a-hoax/)).
+
+This calculation is straightforward enough in a sport like baseball, where a team earns one point if they win and no points if they lose, and each team's likelihood of winning under complete parity is 50%. It's a bit more difficult for a sport like hockey, where a team can earn 2, 1, or 0 standings points each game if they win, win in overtime, or lose – and **I don’t know how I would even begin calculating it for PUBG**, where the points system includes a lot of events that happen within the game, beyond just who wins. I decided not to go that route.
+
+&#x200B;
+
+**PARITY AND BIODIVERSITY – WORKING WITH WHAT I KNOW**
+
+&#x200B;
+
+There are some equations coming up, but if that's not your thing you can just skim over them and go two sections ahead.
+ 
+Another option for assessing parity that came up in my research was the Herfindahl–Hirschman index, a measure of market concentration in economics. I looked into this a bit more, because it seemed familiar. 
+
+As it turns out, it’s the same formula as something I know well: **a measure of biodiversity known as [Simpson’s index](https://www.nature.com/articles/163688a0)**, or the Simpson concentration index, developed by Edward Simpson in 1949. The Herfindahl–Hirschman index was independently discovered a year after Simpson's work.
+
+**Out of all the points earned throughout an entire NPL phase by all teams, if you take two points at random** – let's say one is a kill point from match 5, and one is a placement point from match 21 – **Simpson's index, $D$, is the probability that these points were earned by the same team**. Or, if you're looking at a patch of boreal forest, Simpson's index is the probability that two randomly selected trees belong to the same species.
+
+$$D = \sum_{i=1}^S p_i^2$$
+
+To calculate $D$, you first count the number of individuals of each species, or points earned per team, as well as the total number of species or teams. $p_i$ is the proportion of individuals or points belonging to the i^th^ species or team, out of all individuals or all points earned by all teams.
+
+Simpson’s index is useful, but **it's tough to compare between multiple measures of this index**. If I’m trying to see if parity increased in the NPL from one phase to the next, what does the difference between a Simpson's index of `r round(diversity(NPL1_parity$points, index = "simpson"), digits = 3)` in Phase 1 and `r round(diversity(NPL2_parity$points, index = "simpson"), digits = 3)` in Phase 2 mean in terms of the actual teams and their competition? 
+
+The index **doesn't scale linearly** with increasing diversity or parity, and it's not intuitive to interpret. **At high levels of this index close to 1, [small changes can represent drastic differences in parity](https://jonlefcheck.net/2012/10/23/diversity-as-effective-numbers/) – or not.**
+
+&#x200B;
+
+**A BETTER MEASURE OF PARITY**
+
+&#x200B;
+
+The majority of metrics in ecology for describing biodiversity, like Simpson’s index, are **based on the concept of entropy** in information theory. Entropy is the **disorder in a system**, the degree of uncertainty associated with predicting bits of information – like determining whether individuals drawn from a community are the same or different species. 
+
+To address the issues of non-linearity and interpretability with these entropy-based indices, [Lou Jost (2006)](http://dx.doi.org/10.1111/j.2006.0030-1299.14714.x) ([PDF](https://wolfweb.unr.edu/~ldyer/classes/jost06.pdf)) proposed that they **should be converted into a “true” measure of diversity called the "effective number of species"** [(MacArthur 1965)](https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1469-185X.1965.tb00815.x), also known as a Hill number [(Hill 1973)](https://esajournals.onlinelibrary.wiley.com/doi/10.2307/1934352), which is **the number of equally abundant species necessary to produce the observed value of diversity.**
+
+To put this another way, this conversion to effective species generates the hypothetical community where each species has the same number of individuals, instead of some rare and some common species, that has an equivalent diversity index to the actual community you’ve observed – or **the hypothetical league that has the same level of parity as the actual league, but where all teams earn the exact same number of points** – and **counts the number of species or teams in that hypothetical group**. 
+
+**This measure scales linearly**, so if the community is twice as diverse when you come back and sample it again, the effective number of species is also doubled. It makes it easier to **meaningfully compare two measurements.**
+
+All the conversions of entropy-based metrics to "true" diversity are just special cases of the same overall formula, because these metrics are all related to each other.
+
+This expression for this “true” diversity is:
+
+$$^qD = \left( \sum_{i=1}^S p_i^q \right) ^{1/(1 - q)}$$
+
+where $^qD$ is the effective number of species, and $q$ is the “order” of the equation. When $q = 0$, the result is just the number of different species that you counted, with no information about their relative rarity.
+
+Simpson’s index can be converted to an effective number of species in this way. The **inverse Simpson’s index is also used as a measure of diversity**, and again is also referred to as Simpson’s index, because we like things to be clear and easy to understand in ecology.
+
+The **inverse Simpson's index, $1/D$, happens to also be $^2D$**, the second-order version of this generalized equation for converting to effective species numbers, where $q = 2$.
+
+$$^2D = 1 / {\sum_{i=1}^S p_i^q} $$
+
+When you calculate $^2D$ for the NPL, what you get is **the effective number of teams in each phase** – the number of equally successful teams that would give the same value of parity that was actually observed in each phase.**
+
+&#x200B;
+
+**DID PHASE 2 HAVE HIGHER PARITY?**
+
+&#x200B;
+
+So, after all this theoretical work, what’s the actual answer to my question? Let's look at **the effective number of teams in each phase.**
+
+I calculated the effective number of teams in each phase with the [inverse Simpson's index](https://www.rdocumentation.org/packages/vegan/versions/2.4-2), and [bootstrapped confidence intervals](http://www.dataanalytics.org.uk/Publications/CERE%20Support/custom%20R%20commands.htm#H_boot) for these measurements to compare them.
+
+&#x200B;
+
+``` {r simpsons_index_NPL_viz, echo = FALSE, message = FALSE, results = "hide", fig.height = 6.5, fig.width = 7.5}
+
+# effective teams plot
+compare_NPL_parity <- NPL_parity %>%
+  group_by(phase) %>%
+  summarise(invsimpson = diversity(points, index = "invsimpson"),
+            lower_ci = H_boot(points, index = "invsimpson", R = 2000, ci = 95)$CI[1],
+            upper_ci = H_boot(points, index = "invsimpson", R = 2000, ci = 95)$CI[2])
+
+pp <- compare_NPL_parity %>%
+  ungroup() %>%
+  mutate(phase = fct_reorder(phase, invsimpson, .desc = FALSE)) %>%
+  ggplot(aes(phase, invsimpson)) +
+      geom_segment(aes(x = phase, 
+                     y = lower_ci, 
+                     xend = phase, 
+                     yend = upper_ci,
+                     color = phase)) +
+      scale_color_viridis(discrete = TRUE,
+                          option = "plasma", 
+                          direction = 1, 
+                          guide = FALSE,
+                          begin = 0.1,
+                          end = 0.8) +
+      geom_point(color = "white", 
+                 shape = 16, 
+                 size = 4) +
+      geom_point(color = "black", 
+                 shape = 16, 
+                 size = 1.3) +
+      xlab("Phase") +
+      ylab("Parity (Effective Number of Teams)") +
+      theme_bw() +
+      theme(axis.title.y = element_text(margin = margin(r = 20)), 
+           axis.title.x = element_text(margin = margin(t = 10)),
+           axis.text.x = element_blank(),
+           axis.ticks.x = element_blank(), 
+           panel.grid.major = element_line(color = "white"),
+           text = element_text(family = "Helvetica Neue"))
+
+pp <- pp + geom_text(aes(x = phase, 
+                          y = lower_ci - 0.045,
+                          label = phase,
+                          family = "Helvetica"),
+                      size = 3.2)
+
+suppressWarnings(print(pp))
+
+
+```
+
+^*Parity in the NPL. Inverse Simpson's indices, with confidence intervals, for the NPL Phase 1 and Phase 2, showing the effective number of teams in each phase.*^
+
+&#x200B;
+
+Out of a lobby with 16 teams, **the effective number of teams in Phase 1 was `r round(diversity(NPL1_parity$points, index = "invsimpson"), digits = 3)`**, 95% CI = [`r round(H_boot(NPL1_parity$points, index = "invsimpson", R = 2000, ci = 95)$CI[1], digits = 3)`, `r round(H_boot(NPL1_parity$points, index = "invsimpson", R = 2000, ci = 95)$CI[2], digits = 3)`], and **`r round(diversity(NPL2_parity$points, index = "invsimpson"), digits = 3)` in Phase 2**, 95% CI = [`r round(H_boot(NPL2_parity$points, index = "invsimpson", R = 2000, ci = 95)$CI[1], digits = 3)`, `r round(H_boot(NPL2_parity$points, index = "invsimpson", R = 2000, ci = 95)$CI[2], digits = 3)`]. 
+
+**The values can be interpreted as the number of “typical" teams in the league.** If the effective number of teams were 1 or 2, that would mean only a few teams monopolized the vast majority the points; if it were 16, that would be perfect parity.
+
+**Parity did increase from Phase 1 to Phase 2**, as expected. You can see that the confidence intervals – just barely – don't overlap, meaning that **there is a significant difference between the parity of the two phases, but the size of the effect is fairly small.**
+
+How small?
+
+&#x200B;
+
+**NPL PARITY IN CONTEXT**
+
+&#x200B;
+
+**To put this difference in parity in perspective, I created a dataset of all the standings points from every major international competitive PUBG league with a 16-team lobby\*, and plotted their parity values to show the overall spread in parity.**
+
+&#x200B;
+
+``` {r simpsons_index_viz, echo = FALSE, message = FALSE, results = "hide", fig.height = 6.5, fig.width = 7.5}
+
+# plot for all leagues
+
+# team and phase names, ordered in ascending order by simpsons index
+
+team_phase_names <- c("LA P1", "ANZ P1", "PSC P1", "NPL C P2", "PKC P1", "NPL C P1", "PJS 2 P3", "PJS 2 P2", "PEL C P1", "PJS P1", "PJS P2", "NPL P1", "PJS 2 P1", "PEL P1", "NPL P2", "ML P1", "ML P2", "PKL P1")
+
+# find inverse simpson's index for all teams
+# boostrap estimates of 95% confidence interval upper and lower bounds for each index
+# create dataframe with these values
+compare_parity <- global_parity %>%
+  group_by(phase) %>%
+  summarise(invsimpson = diversity(points, index = "invsimpson"),
+            lower_ci = H_boot(points, index = "invsimpson", R = 2000, ci = 95)$CI[1],
+            upper_ci = H_boot(points, index = "invsimpson", R = 2000, ci = 95)$CI[2])
+
+pp <- compare_parity %>%
+  mutate(phase = fct_reorder(phase, invsimpson, .desc = FALSE)) %>%
+  ggplot(aes(phase, invsimpson)) +
+      geom_segment(aes(x = phase, 
+                     y = lower_ci, 
+                     xend = phase, 
+                     yend = upper_ci,
+                     color = phase)) +
+      scale_color_viridis(discrete = TRUE,
+                          option = "viridis", 
+                          direction = 1, 
+                          guide = FALSE,
+                          begin = 0,
+                          end = 1) +
+      geom_point(color = "white", 
+                 shape = 16, 
+                 size = 4) +
+      geom_point(color = "black", 
+                 shape = 16, 
+                 size = 1.3) +
+      xlab("League and Phase") +
+      ylab("Parity (Effective Number of Teams)") +
+      theme_bw() +
+      theme(axis.title.y = element_text(margin = margin(r = 20)), 
+           axis.title.x = element_text(margin = margin(t = 10)),
+           axis.text.x = element_blank(),
+           axis.ticks.x = element_blank(), 
+           panel.grid.major = element_line(color = "white"),
+           text = element_text(family = "Helvetica Neue"))
+
+pp <- pp + geom_text(aes(x = phase, 
+                          y = lower_ci - 0.1,
+                          label = phase,
+                          family = "Helvetica"),
+                      size = 2.5)
+
+suppressWarnings(print(pp))
+
+```
+
+^*Parity in competitive PUBG. Inverse Simpson's indices, with confidence intervals, for each phase of every major international league with a 16-team lobby, showing the effective number of teams in each league. Numbers on the ends of league acronyms refer to the phase.*^
+
+&#x200B;
+
+**Phase 2 of the NPL actually had the highest parity of all leagues so far**, with Phase 1 not far behind.
+
+PEL also has high parity. Note that PEL Phase 2, and Phase 2 of other leagues that I would otherwise have included, are not finished yet. I'm interested to see how PEL Phase 2 compares to Phase 1 – it shouldn't be much different, because there's been no change in the lobby between phases yet.
+
+The league and phase with the lowest parity is Phase 1 of the [ESL LA League, in Latin America](https://liquipedia.net/pubg/ESL/LA_League/Season_2).
+
+LA increased parity from Phase 1 to 2, but other than that and the NPL there have been no major changes in parity between phases in other leagues.
+
+I'd be interested to look into the relationship between parity and the number of matches played.
+
+&#x200B;
+
+**NPL LORENZ CURVES IN CONTEXT**
+
+&#x200B;
+
+I added LA Phase 1 to the Lorenz curve plot for comparison, so you can see where the NPL phases fit in to the overall variability in parity, from the most to least.
+
+&#x200B;
+
+``` {r lorenz_viz_context, echo = FALSE, results = "hide", fig.height = 6.5, fig.width = 7.5}
+
+# a lorenz curve comparison of leagues and phases with most and least parity
+# first, find out which league has the most and least parity
+summary_parity <- global_parity %>%
+  group_by(phase) %>%
+  summarise(invsimpson = diversity(points, index = "invsimpson"))
+summary_parity %>% filter(invsimpson == max(invsimpson)) # NPL2 has the highest parity, as it turns out
+summary_parity %>% filter(invsimpson == min(invsimpson)) # LA1 has the lowest parity
+
+# gini coefficient of LA Phase 1
+ineq(LA1_parity$points, type = "Gini") # 0.2700163
+
+# build the plot
+lz_compare <- bind_rows(NPL1_parity, NPL2_parity)
+lz_compare <- bind_rows(lz_compare, LA1_parity)
+
+lz_compare %<>%
+  group_by(phase) %>%
+  mutate(gini = ineq(points, type = "Gini"))
+
+lzc <- lz_compare %>%
+  ungroup() %>%
+  mutate(phase = fct_reorder(phase, gini)) %>%
+  ggplot(aes(points,
+             group = phase,
+             fill = phase,
+             colour = phase)) +
+  stat_lorenz(geom = "area", size = 0.76, alpha = 0.25) +
+  geom_abline(linetype = "dashed") +
+  scale_fill_viridis(begin = 0.1,
+                      end = 0.8,
+                      option = "plasma",
+                      direction = -1,
+                      discrete = TRUE,
+                      guide = "legend") +
+  scale_colour_viridis(begin = 0.1,
+                      end = 0.8,
+                      option = "plasma",
+                      direction = -1,
+                      discrete = TRUE,
+                      guide = "legend") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Cumulative Proportion of Teams in the League",
+       y = "Cumulative Proportion of Total Points",
+       fill = "\n", # League and Phase
+       # original problem w legend not merging 
+       # was having a custom name here for fill and not colour
+       colour = "\n") + # League and Phase
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica", size = 10))
+
+lzc
+
+```
+
+^*Lorenz curves for NPL Phase 1 and Phase 2, and ESL LA League Phase 1.*^
+
+&#x200B;
+
+This post was a bit dense, but I hope I explained things well enough to at least get across why I find everything here so interesting!
+
+My .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-07-03-parity.Rmd), for those of you who are interested.
+
+&#x200B;
+
+**tl;dr I looked at parity, with a tangent about ecology. NPL Phase 2 has a more competitive lobby than Phase 1, but not by much. NPL Phase 2 has the highest parity so far out of all competitive PUBG leagues internationally.**
+
+&#x200B;
+
+*\ I couldn't use leagues or tournaments with a round-robin format, like the PKL or PCL, for the purposes of this comparison.
+
+** Any ecologists reading this might ask why I didn't use the Shannon index, with $q = 1$, which less severely discounts rare species than the Simpson index. The Shannon index is said to better balance how it weighs rare and abundant species. The answer is: it's a lot harder to bootstrap confidence intervals for the converted Shannon index, and I couldn't find an R package that someone else had already written to do it for me :)
