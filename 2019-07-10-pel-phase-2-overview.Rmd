@@ -1773,7 +1773,7 @@ The top four teams shifted around over the final few matches as well, with Team 
 
 NV seemed to have a steady drop in performance from match 73 on, while the other top teams were a bit more consistent.
 
-in the lower half of the standings, CrowCrowd had a chaotic Phase 2, bumping up their average with a few great matches (53, 67). ENCE declined to a low point at match 74 and improved from there, and Vitality turned things around from there as well. Reciprocity continuously improved throughout the phase.
+In the lower half of the standings, CrowCrowd had a chaotic Phase 2, bumping up their average with a few great matches (53, 67). ENCE declined to a low point at match 74 and improved from there, and Vitality turned things around from there as well. Reciprocity continuously improved throughout the phase.
 
 &#x200B;
 
@@ -1782,6 +1782,8 @@ in the lower half of the standings, CrowCrowd had a chaotic Phase 2, bumping up 
 &#x200B;
 
 Now that Phase 2 of PEL and PEL-C is are complete, I've created an updated visualization of the parity metric I described in [my previous post](https://pubgdataviz.netlify.com/post/2019-07-03-parity/). If you missed it, **parity is the level of fairness or competitiveness in a league**. High parity means teams are more similar in terms of skill, and have a more equal chance of winning, which makes predicting the results more difficult.
+
+&#x200B;
 
 ``` {r parity_data_setup, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
 
