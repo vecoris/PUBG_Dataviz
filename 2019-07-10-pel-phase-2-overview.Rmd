@@ -1,0 +1,2107 @@
+---
+title: "A Look Back at PEL Phase 2"
+author: "u/firstoverall"
+date: 2019-07-10
+categories: ["PEL", "PUBG"]
+tags: ["PEL", "PUBG", "Phase 2"]
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(collapse = TRUE)
+library(here)
+library(knitr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(ggthemes)
+library(viridis)
+library(magrittr)
+library(tibble)
+library(plotly)
+library(transformr)
+library(units)
+library(vegan)
+diversity_boot <- here("static", "CERE.RData") 
+load(diversity_boot)
+
+Sys.setenv("plotly_username" = "descent")
+Sys.setenv("plotly_api_key" = "KOJaKam6unaHMsBRocxh")
+Sys.setenv(TZ = "MST")
+
+# below you will find the gory R code of a biologist; proceed with caution
+
+```
+
+```{r pel_points, include = FALSE}
+
+# create the dataframe
+# match 1 data
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_1 <- tibble(placement_points = c(10, 1, 6, 3,
+                                     4, 0, 0, 2,
+                                     5, 0, 1, 0,
+                                     0, 0, 0, 0),
+                kill_points = c(9, 7, 6, 3, 
+                                4, 0, 3, 2, 
+                                10, 1, 6, 4, 
+                                1, 3, 0, 0),
+                team = c("G2", "NV", "PK", "FC", 
+                         "EZ4", "TL", "WIN", "DA",
+                         "CC", "NIP", "RYE", "VIT",
+                         "TSM", "UT", "REC", "M19"),
+                match = 1)
+
+PEL_data <- PEL_1
+
+# match 2
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_2 <- tibble(placement_points = c(1, 0, 3, 4,
+                                     0, 10, 6, 5,
+                                     0, 1, 2, 0,
+                                     0, 0, 0, 0),
+                kill_points = c(10, 0, 6, 3, 
+                                2, 10, 5, 5, 
+                                3, 5, 4, 2, 
+                                1, 1, 0, 2),
+                team = c("G2", "NV", "PK", "FC", 
+                         "EZ4", "TL", "WIN", "DA",
+                         "CC", "NIP", "RYE", "VIT",
+                         "TSM", "UT", "REC", "M19"),
+                match = 2)
+PEL_data <- bind_rows(PEL_data, PEL_2)
+
+# match 3
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_3 <- tibble(placement_points = c(5, 3, 1, 10,
+                                     0, 1, 0, 6,
+                                     0, 0, 0, 0,
+                                     2, 4, 0, 0),
+                kill_points = c(0, 8, 5, 9,
+                                2, 4, 0, 3,
+                                1, 5, 4, 6,
+                                7, 1, 2, 2),
+                team = c("G2", "NV", "PK", "FC", 
+                         "EZ4", "TL", "WIN", "DA",
+                         "CC", "NIP", "RYE", "VIT",
+                         "TSM", "UT", "REC", "M19"),
+                match = 3)
+PEL_data <- bind_rows(PEL_data, PEL_3)
+
+# match 4
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_4 <- tibble(placement_points = c(3, 10, 4, 0,
+                                     6, 0, 5, 0,
+                                     0, 2, 0, 0,
+                                     1, 0, 0, 1),
+                kill_points = c(5, 10, 7, 0,
+                                13, 3, 4, 0,
+                                1, 5, 1, 3,
+                                1, 1, 5, 2),
+                team = c("G2", "NV", "PK", "FC", 
+                         "EZ4", "TL", "WIN", "DA",
+                         "CC", "NIP", "RYE", "VIT",
+                         "TSM", "UT", "REC", "M19"),
+                match = 4)
+PEL_data <- bind_rows(PEL_data, PEL_4)
+
+# match 5
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_5 <- tibble(placement_points = c(0, 4, 6, 0,
+                                     5, 1, 10, 0,
+                                     0, 3, 1, 0,
+                                     0, 2, 0, 0),
+                kill_points = c(7, 7, 7, 1, 
+                                4, 3, 6, 2, 
+                                2, 5, 3, 2, 
+                                0, 3, 4, 5),
+                team = c("DA", "G2", "TSM", "NV", 
+                         "FC", "RYE", "M19", "VIT",
+                         "TL", "NIP", "EZ4", "WIN",
+                         "PK", "CC", "REC", "UT"),
+                match = 5)
+PEL_data <- bind_rows(PEL_data, PEL_5)
+
+# match 6
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_6 <- tibble(placement_points = c(4, 0, 5, 1, 
+                                     1, 10, 0, 0, 
+                                     0, 6, 0, 0, 
+                                     2, 0, 3, 0),
+                kill_points = c(2, 2, 5, 7, 
+                                5, 9, 3, 3, 
+                                2, 7, 6, 0, 
+                                5, 3, 0, 0),
+                team = c("DA", "G2", "TSM", "NV", 
+                         "FC", "RYE", "M19", "VIT",
+                         "TL", "NIP", "EZ4", "WIN",
+                         "PK", "CC", "REC", "UT"),
+                match = 6)
+PEL_data <- bind_rows(PEL_data, PEL_6)
+
+# match 7
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_7 <- tibble(placement_points = c(3, 0, 2, 10, 
+                                     5, 0, 1, 0, 
+                                     6, 1, 0, 4, 
+                                     0, 0, 0, 0),
+                kill_points = c(4, 7, 10, 10, 
+                                4, 4, 2, 6, 
+                                8, 0, 1, 4, 
+                                0, 0, 1, 0),
+                team = c("DA", "G2", "TSM", "NV", 
+                         "FC", "RYE", "M19", "VIT",
+                         "TL", "NIP", "EZ4", "WIN",
+                         "PK", "CC", "REC", "UT"),
+                match = 7)
+PEL_data <- bind_rows(PEL_data, PEL_7)
+
+# match 8
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_8 <- tibble(placement_points = c(10, 4, 0, 0, 
+                                     1, 0, 0, 6, 
+                                     2, 0, 5, 0, 
+                                     3, 1, 0, 0),
+                kill_points = c(11, 13, 1, 4, 
+                                3, 0, 3, 7, 
+                                3, 0, 1, 4, 
+                                2, 1, 1, 1),
+                team = c("DA", "G2", "TSM", "NV", 
+                         "FC", "RYE", "M19", "VIT",
+                         "TL", "NIP", "EZ4", "WIN",
+                         "PK", "CC", "REC", "UT"),
+                match = 8)
+PEL_data <- bind_rows(PEL_data, PEL_8)
+
+# match 9
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_9 <- tibble(placement_points = c(3, 10, 5, 0, 
+                                     0, 0, 0, 6, 
+                                     0, 0, 2, 4, 
+                                     1, 1, 0, 0),
+                kill_points = c(9, 11, 8, 2, 
+                                4, 1, 6, 5, 
+                                0, 2, 1, 1, 
+                                1, 4, 1, 1),
+                team = c("TSM", "WIN", "CC", "FC",
+                         "G2", "DA", "NV", "TL",
+                         "NIP", "VIT", "EZ4", "M19",
+                         "UT", "PK", "REC", "RYE"),
+                match = 9)
+PEL_data <- bind_rows(PEL_data, PEL_9)
+
+# match 10
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_10 <- tibble(placement_points = c(3, 6, 1, 0, 
+                                      0, 4, 5, 0, 
+                                      10, 0, 2, 0, 
+                                      0, 0, 1, 0),
+                 kill_points = c(7, 6, 2, 1, 
+                                 5, 2, 7, 5, 
+                                 5, 0, 5, 4, 
+                                 3, 5, 0, 1),
+                 team = c("TSM", "WIN", "CC", "FC",
+                          "G2", "DA", "NV", "TL",
+                          "NIP", "VIT", "EZ4", "M19",
+                          "UT", "PK", "REC", "RYE"),
+                 match = 10)
+PEL_data <- bind_rows(PEL_data, PEL_10)
+
+# match 11
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_11 <- tibble(placement_points = c(1, 0, 0, 10, 
+                                      0, 0, 3, 0, 
+                                      0, 6, 5, 1, 
+                                      4, 0, 2, 0),
+                 kill_points = c(1, 2, 8, 16, 
+                                 6, 2, 3, 0, 
+                                 0, 7, 0, 3, 
+                                 4, 0, 1, 0),
+                 team = c("TSM", "WIN", "CC", "FC",
+                          "G2", "DA", "NV", "TL",
+                          "NIP", "VIT", "EZ4", "M19",
+                          "UT", "PK", "REC", "RYE"),
+                 match = 11)
+PEL_data <- bind_rows(PEL_data, PEL_11)
+
+# match 12
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_1
+PEL_12 <- tibble(placement_points = c(5, 2, 1, 0, 
+                                      6, 10, 0, 4,
+                                      3, 1, 0, 0, 
+                                      0, 0, 0, 0),
+                 kill_points = c(9, 0, 8, 0, 
+                                 7, 9, 2, 5, 
+                                 5, 3, 1, 2, 
+                                 1, 3, 0, 2),
+                 team = c("TSM", "WIN", "CC", "FC",
+                          "G2", "DA", "NV", "TL",
+                          "NIP", "VIT", "EZ4", "M19",
+                          "UT", "PK", "REC", "RYE"),
+                 match = 12)
+PEL_data <- bind_rows(PEL_data, PEL_12)
+
+# match 13
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_13 <- tibble(placement_points = c(0, 10, 1, 6,
+                                      2, 5, 0, 4,
+                                      0, 3, 0, 0,
+                                      0, 0, 1, 0),
+                 kill_points = c(3, 11, 4, 8,
+                                 7, 9, 1, 2,
+                                 2, 4, 3, 1,
+                                 3, 1, 1, 1),
+                 team = c("FC", "NV", "NIP", "WIN",
+                          "TSM", "G2", "TL", "RYE",
+                          "EZ4", "CC", "REC", "M19",
+                          "UT", "PK", "VIT", "DA"),
+                 match = 13)
+PEL_data <- bind_rows(PEL_data, PEL_13)
+
+# match 14
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_14 <- tibble(placement_points = c(0, 10, 4, 1,
+                                      6, 0, 0, 3,
+                                      5, 2, 1, 0,
+                                      0, 0, 0, 0),
+                 kill_points = c(3, 7, 5, 2,
+                                 8, 2, 6, 3,
+                                 5, 1, 4, 3,
+                                 6, 2, 0, 0),
+                 team = c("FC", "NV", "NIP", "WIN", 
+                          "TSM", "G2", "TL", "RYE",
+                          "EZ4", "CC", "REC", "M19",
+                          "UT", "PK", "VIT", "DA"),
+                 match = 14)
+PEL_data <- bind_rows(PEL_data, PEL_14)
+
+# match 15
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_15 <- tibble(placement_points = c(10, 0, 0, 4,
+                                      0, 0, 1, 5,
+                                      3, 0, 0, 6,
+                                      0, 1, 0, 2),
+                 kill_points = c(13, 4, 2, 3,
+                                 1, 1, 7, 4,
+                                 6, 1, 0, 3,
+                                 1, 3, 6, 2),
+                 team = c("FC", "NV", "NIP", "WIN", 
+                          "TSM", "G2", "TL", "RYE",
+                          "EZ4", "CC", "REC", "M19",
+                          "UT", "PK", "VIT", "DA"),
+                 match = 15)
+PEL_data <- bind_rows(PEL_data, PEL_15)
+
+# match 16
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_16 <- tibble(placement_points = c(10, 0, 6, 0,
+                                      0, 5, 3, 1,
+                                      0, 0, 4, 0,
+                                      2, 1, 0, 0),
+                 kill_points = c(10, 2, 7, 5,
+                                 4, 6, 6, 2,
+                                 2, 4, 3, 2,
+                                 0, 3, 1, 1),
+                 team = c("FC", "NV", "NIP", "WIN", 
+                          "TSM", "G2", "TL", "RYE",
+                          "EZ4", "CC", "REC", "M19",
+                          "UT", "PK", "VIT", "DA"),
+                 match = 16)
+PEL_data <- bind_rows(PEL_data, PEL_16)
+
+# match 17
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_17 <- tibble(placement_points = c(10, 6, 0, 0, 
+                                      4, 5, 0, 0, 
+                                      2, 0, 1, 0, 
+                                      1, 0, 3, 0),
+                 kill_points = c(9, 16, 2, 3, 
+                                 2, 4, 1, 1, 
+                                 3, 2, 3, 4, 
+                                 3, 0, 3, 2),
+                 team = c("TL", "CC", "FC", "NV", 
+                          "UT", "TSM", "PK", "REC",
+                          "EZ4", "VIT", "M19", "G2",
+                          "DA", "NIP", "WIN", "RYE"),
+                 match = 17)
+PEL_data <- bind_rows(PEL_data, PEL_17)
+
+# match 18
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_18 <- tibble(placement_points = c(0, 0, 6, 10, 
+                                      0, 0, 2, 5, 
+                                      0, 0, 3, 0, 
+                                      1, 4, 1, 0),
+                 kill_points = c(1, 3, 11, 10, 
+                                 2, 0, 4, 9, 
+                                 1, 5, 5, 3, 
+                                 2, 1, 0, 2),
+                 team = c("TL", "CC", "FC", "NV", 
+                          "UT", "TSM", "PK", "REC",
+                          "EZ4", "VIT", "M19", "G2",
+                          "DA", "NIP", "WIN", "RYE"),
+                 match = 18)
+PEL_data <- bind_rows(PEL_data, PEL_18)
+
+# match 19
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_19 <- tibble(placement_points = c(10, 0, 0, 0, 
+                                      0, 4, 3, 2, 
+                                      6, 0, 0, 0, 
+                                      5, 1, 0, 1),
+                 kill_points = c(10, 1, 1, 2, 
+                                 0, 3, 8, 4, 
+                                 3, 2, 2, 6, 
+                                 3, 3, 3, 1),
+                 team = c("TL", "CC", "FC", "NV", 
+                          "UT", "TSM", "PK", "REC",
+                          "EZ4", "VIT", "M19", "G2",
+                          "DA", "NIP", "WIN", "RYE"),
+                 match = 19)
+PEL_data <- bind_rows(PEL_data, PEL_19)
+
+# match 20
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_20 <- tibble(placement_points = c(4, 5, 6, 0, 
+                                      10, 3, 0, 1, 
+                                      2, 1, 0, 0, 
+                                      0, 0, 0, 0),
+                 kill_points = c(6, 7, 6, 3, 
+                                 7, 4, 4, 0, 
+                                 3, 8, 3, 3, 
+                                 1, 4, 1, 1),
+                 team = c("TL", "CC", "FC", "NV", 
+                          "UT", "TSM", "PK", "REC",
+                          "EZ4", "VIT", "M19", "G2",
+                          "DA", "NIP", "WIN", "RYE"),
+                 match = 20)
+PEL_data <- bind_rows(PEL_data, PEL_20)
+
+# match 21
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_21 <- tibble(placement_points = c(2, 5, 10, 0, 
+                                      4, 6, 0, 0, 
+                                      3, 0, 0, 0, 
+                                      1, 1, 0, 0),
+                 kill_points = c(6, 8, 7, 4, 
+                                 5, 0, 5, 7, 
+                                 4, 1, 1, 1, 
+                                 5, 0, 0, 2),
+                 team = c("FC", "RYE", "M19", "G2", 
+                          "DA", "TL", "TSM", "CC",
+                          "NIP", "EZ4", "VIT", "REC",
+                          "PK", "NV", "WIN", "UT"),
+                 match = 21)
+PEL_data <- bind_rows(PEL_data, PEL_21)
+
+# match 22
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_22 <- tibble(placement_points = c(10, 5, 3, 2, 
+                                      0, 1, 6, 0, 
+                                      0, 0, 4, 1, 
+                                      0, 0, 0, 0),
+                 kill_points = c(8, 9, 8, 1, 
+                                 1, 3, 6, 5, 
+                                 11, 4, 1, 2, 
+                                 0, 0, 0, 1),
+                 team = c("FC", "RYE", "M19", "G2", 
+                          "DA", "TL", "TSM", "CC",
+                          "NIP", "EZ4", "VIT", "REC",
+                          "PK", "NV", "WIN", "UT"),
+                 match = 22)
+PEL_data <- bind_rows(PEL_data, PEL_22)
+
+# match 23
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_23 <- tibble(placement_points = c(10, 1, 0, 6, 
+                                      5, 0, 4, 0, 
+                                      1, 0, 0, 3, 
+                                      0, 2, 0, 0),
+                 kill_points = c(10, 6, 2, 10, 
+                                 7, 1, 2, 5, 
+                                 2, 2, 4, 2, 
+                                 5, 1, 1, 0),
+                 team = c("FC", "RYE", "M19", "G2", 
+                          "DA", "TL", "TSM", "CC",
+                          "NIP", "EZ4", "VIT", "REC",
+                          "PK", "NV", "WIN", "UT"),
+                 match = 23)
+PEL_data <- bind_rows(PEL_data, PEL_23)
+
+# match 24
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_2
+PEL_24 <- tibble(placement_points = c(0, 1, 2, 0, 
+                                      1, 10, 0, 6, 
+                                      0, 5, 4, 3, 
+                                      0, 0, 0, 0),
+                 kill_points = c(6, 7, 0, 6, 
+                                 6, 7, 2, 1, 
+                                 2, 7, 5, 1, 
+                                 1, 3, 4, 0),
+                 team = c("FC", "RYE", "M19", "G2", 
+                          "DA", "TL", "TSM", "CC",
+                          "NIP", "EZ4", "VIT", "REC",
+                          "PK", "NV", "WIN", "UT"),
+                 match = 24)
+PEL_data <- bind_rows(PEL_data, PEL_24)
+
+# match 25
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_25 <- tibble(placement_points = c(5, 1, 0, 3,
+                                      10, 4, 2, 0,
+                                      0, 1, 0, 0,
+                                      0, 0, 6, 0),
+                 kill_points = c(10, 2, 3, 2,
+                                 11, 9, 7, 1,
+                                 3, 1, 1, 1,
+                                 3, 0, 5, 1),
+                 team = c("UT", "TSM", "TL", "RYE", 
+                          "M19", "FC", "G2", "VIT",
+                          "WIN", "PK", "NIP", "EZ4",
+                          "REC", "NV", "DA", "CC"),
+                 match = 25)
+PEL_data <- bind_rows(PEL_data, PEL_25)
+
+# match 26
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_26 <- tibble(placement_points = c(1, 6, 10, 2,
+                                      4, 1, 0, 3,
+                                      0, 0, 0, 0,
+                                      0, 0, 0, 5),
+                 kill_points = c(5, 8, 11, 3,
+                                 2, 2, 0, 9,
+                                 4, 6, 1, 3,
+                                 2, 2, 0, 2),
+                 team = c("UT", "TSM", "TL", "RYE", 
+                          "M19", "FC", "G2", "VIT",
+                          "WIN", "PK", "NIP", "EZ4",
+                          "REC", "NV", "DA", "CC"),
+                 match = 26)
+PEL_data <- bind_rows(PEL_data, PEL_26)
+
+# match 27
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_27 <- tibble(placement_points = c(1, 6, 10, 2,
+                                      4, 1, 0, 3,
+                                      0, 0, 0, 0,
+                                      0, 0, 0, 5),
+                 kill_points = c(5, 8, 11, 3,
+                                 2, 2, 0, 9,
+                                 4, 6, 1, 3,
+                                 2, 2, 0, 2),
+                 team = c("UT", "TSM", "TL", "RYE", 
+                          "M19", "FC", "G2", "VIT",
+                          "WIN", "PK", "NIP", "EZ4",
+                          "REC", "NV", "DA", "CC"),
+                 match = 27)
+PEL_data <- bind_rows(PEL_data, PEL_27)
+
+# match 28
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_28 <- tibble(placement_points = c(1, 10, 3, 0, 
+                                      0, 1, 0, 0, 
+                                      6, 2, 4, 5, 
+                                      0, 0, 0, 0),
+                 kill_points = c(8, 6, 7, 3, 
+                                 1, 5, 1, 3, 
+                                 6, 7, 6, 5, 
+                                 2, 2, 0, 0),
+                 team = c("UT", "TSM", "TL", "RYE", 
+                          "M19", "FC", "G2", "VIT",
+                          "WIN", "PK", "NIP", "EZ4",
+                          "REC", "NV", "DA", "CC"),
+                 match = 28)
+PEL_data <- bind_rows(PEL_data, PEL_28)
+
+# match 29
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_29 <- tibble(placement_points = c(6, 0, 10, 5, 
+                                      0, 0, 4, 2, 
+                                      0, 0, 3, 0, 
+                                      0, 0, 1, 1),
+                 kill_points = c(14, 3, 9, 5, 
+                                 1, 0, 5, 5, 
+                                 6, 4, 2, 1, 
+                                 1, 3, 3, 1),
+                 team = c("NV", "NIP", "G2", "TL", 
+                          "WIN", "REC", "TSM", "CC",
+                          "EZ4", "RYE", "M19", "FC",
+                          "VIT", "PK", "DA", "UT"),
+                 match = 29)
+PEL_data <- bind_rows(PEL_data, PEL_29)
+
+# match 30
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_30 <- tibble(placement_points = c(10, 6, 0, 0, 
+                                      5, 4, 1, 0, 
+                                      2, 3, 0, 0, 
+                                      1, 0, 0, 0),
+                 kill_points = c(9, 5, 3, 0, 
+                                 7, 9, 7, 6, 
+                                 4, 1, 1, 4, 
+                                 0, 2, 2, 0),
+                 team = c("NV", "NIP", "G2", "TL", 
+                          "WIN", "REC", "TSM", "CC",
+                          "EZ4", "RYE", "M19", "FC",
+                          "VIT", "PK", "DA", "UT"),
+                 match = 30)
+PEL_data <- bind_rows(PEL_data, PEL_30)
+
+# match 31
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_31 <- tibble(placement_points = c(5, 10, 1, 4,
+                                      6, 0, 0, 2, 
+                                      0, 3, 0, 0, 
+                                      0, 0, 0, 1),
+                 kill_points = c(3, 8, 3, 11, 
+                                 11, 4, 0, 2, 
+                                 2, 2, 6, 4, 
+                                 2, 1, 0, 0),
+                 team = c("NV", "NIP", "G2", "TL", 
+                          "WIN", "REC", "TSM", "CC",
+                          "EZ4", "RYE", "M19", "FC",
+                          "VIT", "PK", "DA", "UT"),
+                 match = 31)
+PEL_data <- bind_rows(PEL_data, PEL_31)
+
+# match 32
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_32 <- tibble(placement_points = c(3, 6, 10, 5, 
+                                      0, 4, 2, 0, 
+                                      1, 0, 0, 0, 
+                                      0, 0, 0, 1),
+                 kill_points = c(5, 8, 9, 5, 
+                                 3, 9, 4, 2, 
+                                 3, 2, 0, 1, 
+                                 4, 1, 1, 2),
+                 team = c("NV", "NIP", "G2", "TL", 
+                          "WIN", "REC", "TSM", "CC",
+                          "EZ4", "RYE", "M19", "FC",
+                          "VIT", "PK", "DA", "UT"),
+                 match = 32)
+PEL_data <- bind_rows(PEL_data, PEL_32)
+
+# match 33
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_33 <- tibble(placement_points = c(0, 10, 5, 1, 
+                                      6, 0, 0, 3, 
+                                      0, 0, 4, 0, 
+                                      2, 0, 0, 1),
+                 kill_points = c(1, 9, 5, 1, 
+                                 9, 3, 4, 5, 
+                                 0, 2, 3, 5, 
+                                 6, 2, 2, 2),
+                 team = c("NV", "EZ4", "G2", "FC", 
+                          "DA", "TSM", "RYE", "PK",
+                          "REC", "CC", "NIP", "TL",
+                          "VIT", "UT", "M19", "WIN"),
+                 match = 33)
+PEL_data <- bind_rows(PEL_data, PEL_33)
+
+# match 34
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_34 <- tibble(placement_points = c(0, 0, 2, 4, 
+                                      0, 3, 6, 0, 
+                                      10, 5, 0, 0, 
+                                      0, 1, 1, 0),
+                 kill_points = c(0, 0, 6, 5, 
+                                 2, 1, 5, 1, 
+                                 12, 11, 1, 4, 
+                                 3, 2, 2, 3),
+                 team = c("NV", "EZ4", "G2", "FC", 
+                          "DA", "TSM", "RYE", "PK",
+                          "REC", "CC", "NIP", "TL",
+                          "VIT", "UT", "M19", "WIN"),
+                 match = 34)
+PEL_data <- bind_rows(PEL_data, PEL_34)
+
+# match 35
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_35 <- tibble(placement_points = c(10, 3, 6, 5, 
+                                      0, 4, 0, 1, 
+                                      0, 2, 0, 0, 
+                                      0, 0, 0, 1),
+                 kill_points = c(7, 2, 10, 11, 
+                                 5, 5, 4, 3, 
+                                 2, 3, 0, 1, 
+                                 2, 3, 0, 1),
+                 team = c("NV", "EZ4", "G2", "FC", 
+                          "DA", "TSM", "RYE", "PK",
+                          "REC", "CC", "NIP", "TL",
+                          "VIT", "UT", "M19", "WIN"),
+                 match = 35)
+PEL_data <- bind_rows(PEL_data, PEL_35)
+
+# match 36
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_3
+PEL_36 <- tibble(placement_points = c(10, 5, 0, 0, 
+                                      1, 3, 2, 6, 
+                                      0, 0, 4, 0, 
+                                      0, 0, 1, 0),
+                 kill_points = c(11, 9, 0, 4, 
+                                 5, 7, 4, 5, 
+                                 0, 0, 9, 4, 
+                                 1, 0, 2, 0),
+                 team = c("NV", "EZ4", "G2", "FC", 
+                          "DA", "TSM", "RYE", "PK",
+                          "REC", "CC", "NIP", "TL",
+                          "VIT", "UT", "M19", "WIN"),
+                 match = 36)
+PEL_data <- bind_rows(PEL_data, PEL_36)
+
+# match 37
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_37 <- tibble(placement_points = c(10, 3, 1, 2, 
+                                      4, 6, 0, 1, 
+                                      5, 0, 0, 0, 
+                                      0, 0, 0, 0),
+                 kill_points = c(14, 8, 4, 7, 
+                                 8, 3, 2, 3, 
+                                 4, 2, 0, 2, 
+                                 2, 0, 0, 0),
+                 team = c("PK", "FC", "VIT", "TL", 
+                          "NV", "UT", "RYE", "CC",
+                          "DA", "M19", "TSM", "NIP",
+                          "EZ4", "REC", "WIN", "G2"),
+                 match = 37)
+PEL_data <- bind_rows(PEL_data, PEL_37)
+
+# match 38
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_38 <- tibble(placement_points = c(0, 6, 0, 10, 
+                                      1, 3, 0, 5, 
+                                      0, 2, 4, 0, 
+                                      0, 0, 0, 1),
+                 kill_points = c(8, 5, 0, 6, 
+                                 5, 2, 6, 2, 
+                                 3, 3, 6, 1, 
+                                 0, 0, 7, 5),
+                 team = c("PK", "FC", "VIT", "TL", 
+                          "NV", "UT", "RYE", "CC",
+                          "DA", "M19", "TSM", "NIP",
+                          "EZ4", "REC", "WIN", "G2"),
+                 match = 38)
+PEL_data <- bind_rows(PEL_data, PEL_38)
+
+# match 39
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_39 <- tibble(placement_points = c(0, 10, 1, 0, 
+                                      2, 5, 6, 1, 
+                                      0, 0, 0, 4, 
+                                      0, 3, 0, 0),
+                 kill_points = c(1, 14, 1, 4, 
+                                 3, 2, 4, 4, 
+                                 3, 5, 0, 8, 
+                                 0, 5, 2, 2),
+                 team = c("PK", "FC", "VIT", "TL", 
+                          "NV", "UT", "RYE", "CC",
+                          "DA", "M19", "TSM", "NIP",
+                          "EZ4", "REC", "WIN", "G2"),
+                 match = 39)
+PEL_data <- bind_rows(PEL_data, PEL_39)
+
+# match 40
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_40 <- tibble(placement_points = c(5, 0, 10, 0, 
+                                      0, 1, 1, 4, 
+                                      0, 3, 6, 0, 
+                                      2, 0, 0, 0),
+                 kill_points = c(10, 0, 15, 1, 
+                                 5, 6, 6, 2, 
+                                 3, 2, 0, 0, 
+                                 7, 2, 0, 1),
+                 team = c("PK", "FC", "VIT", "TL", 
+                          "NV", "UT", "RYE", "CC",
+                          "DA", "M19", "TSM", "NIP",
+                          "EZ4", "REC", "WIN", "G2"),
+                 match = 40)
+PEL_data <- bind_rows(PEL_data, PEL_40)
+
+# match 41
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_41 <- tibble(placement_points = c(10, 3, 2, 0, 
+                                      6, 1, 4, 1, 
+                                      5, 0, 0, 0, 
+                                      0, 0, 0, 0),
+                 kill_points = c(11, 4, 5, 5, 
+                                 5, 0, 9, 2, 
+                                 8, 3, 0, 1, 
+                                 4, 0, 3, 0),
+                 team = c("NV", "RYE", "G2", "DA", 
+                          "FC", "REC", "UT", "WIN",
+                          "VIT", "TL", "CC", "NIP",
+                          "EZ4", "M19", "TSM", "PK"),
+                 match = 41)
+PEL_data <- bind_rows(PEL_data, PEL_41)
+
+# match 42
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_42 <- tibble(placement_points = c(0, 10, 0, 6, 
+                                      0, 1, 0, 0, 
+                                      4, 3, 5, 0, 
+                                      1, 2, 0, 0),
+                 kill_points = c(3, 12, 3, 5, 
+                                 2, 1, 6, 1, 
+                                 5, 8, 9, 0, 
+                                 1, 0, 2, 1),
+                 team = c("NV", "RYE", "G2", "DA", 
+                          "FC", "REC", "UT", "WIN",
+                          "VIT", "TL", "CC", "NIP",
+                          "EZ4", "M19", "TSM", "PK"),
+                 match = 42)
+PEL_data <- bind_rows(PEL_data, PEL_42)
+
+# match 43
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_43 <- tibble(placement_points = c(2, 6, 0, 0, 
+                                      0, 10, 0, 4,
+                                      0, 1, 1, 5, 
+                                      3, 0, 0, 0),
+                 kill_points = c(13, 4, 1, 3, 
+                                 1, 9, 1, 8, 
+                                 1, 5, 1, 4, 
+                                 3, 2, 0, 1),
+                 team = c("NV", "RYE", "G2", "DA", 
+                          "FC", "REC", "UT", "WIN",
+                          "VIT", "TL", "CC", "NIP",
+                          "EZ4", "M19", "TSM", "PK"),
+                 match = 43)
+PEL_data <- bind_rows(PEL_data, PEL_43)
+
+# match 44
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_44 <- tibble(placement_points = c(10, 1, 5, 2, 
+                                      6, 0, 0, 1, 
+                                      0, 0, 0, 3, 
+                                      0, 4, 0, 0),
+                 kill_points = c(8, 2, 16, 7, 
+                                 5, 2, 3, 6, 
+                                 0, 1, 2, 3, 
+                                 1, 2, 0, 0),
+                 team = c("NV", "RYE", "G2", "DA", 
+                          "FC", "REC", "UT", "WIN",
+                          "VIT", "TL", "CC", "NIP",
+                          "EZ4", "M19", "TSM", "PK"),
+                 match = 44)
+PEL_data <- bind_rows(PEL_data, PEL_44)
+
+# match 45
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_45 <- tibble(placement_points = c(0, 6, 10, 2, 
+                                      0, 0, 0, 3, 
+                                      4, 1, 0, 0, 
+                                      5, 0, 1, 0),
+                 kill_points = c(1, 7, 11, 5, 
+                                 1, 0, 4, 5, 
+                                 4, 2, 4, 4, 
+                                 4, 1, 1, 2),
+                 team = c("TL", "WIN", "NIP", "G2", 
+                          "TSM", "EZ4", "PK", "RYE",
+                          "NV", "M19", "DA", "REC",
+                          "FC", "UT", "CC", "VIT"),
+                 match = 45)
+PEL_data <- bind_rows(PEL_data, PEL_45)
+
+# match 46
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_46 <- tibble(placement_points = c(4, 0, 1, 10, 
+                                      2, 1, 0, 0, 
+                                      0, 6, 5, 3, 
+                                      0, 0, 0, 0),
+                 kill_points = c(3, 0, 8, 7, 
+                                 7, 8, 4, 2, 
+                                 3, 5, 1, 2, 
+                                 2, 2, 1, 0),
+                 team = c("TL", "WIN", "NIP", "G2", 
+                          "TSM", "EZ4", "PK", "RYE",
+                          "NV", "M19", "DA", "REC",
+                          "FC", "UT", "CC", "VIT"),
+                 match = 46)
+PEL_data <- bind_rows(PEL_data, PEL_46)
+
+# match 47
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_47 <- tibble(placement_points = c(0, 10, 1, 4, 
+                                      6, 3, 0, 1, 
+                                      2, 0, 0, 5, 
+                                      0, 0, 0, 0),
+                 kill_points = c(7, 12, 0, 1, 
+                                 10, 1, 1, 5, 
+                                 5, 1, 3, 3, 
+                                 3, 4, 1, 1),
+                 team = c("TL", "WIN", "NIP", "G2", 
+                          "TSM", "EZ4", "PK", "RYE",
+                          "NV", "M19", "DA", "REC",
+                          "FC", "UT", "CC", "VIT"),
+                 match = 47)
+PEL_data <- bind_rows(PEL_data, PEL_47)
+
+# match 48
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_4
+PEL_48 <- tibble(placement_points = c(10, 0, 2, 0, 
+                                      0, 6, 5, 0, 
+                                      0, 0, 3, 1, 
+                                      0, 1, 4, 0),
+                 kill_points = c(17, 4, 3, 0, 
+                                 2, 6, 8, 4, 
+                                 2, 3, 2, 0, 
+                                 1, 4, 1, 0),
+                 team = c("TL", "WIN", "NIP", "G2", 
+                          "TSM", "EZ4", "PK", "RYE",
+                          "NV", "M19", "DA", "REC",
+                          "FC", "UT", "CC", "VIT"),
+                 match = 48)
+PEL_data <- bind_rows(PEL_data, PEL_48)
+
+# match 49
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_49 <- tibble(placement_points = c(10, 6, 0, 1, 
+                                      0, 0, 2, 1, 
+                                      5, 4, 0, 0, 
+                                      0, 3, 0, 0),
+                 kill_points = c(13, 5, 2, 5, 
+                                 4, 1, 1, 5, 
+                                 4, 2, 2, 5, 
+                                 2, 3, 1, 3),
+                 team = c("FC", "RYE", "G2", "TSM", 
+                          "NIP", "NV", "REC", "PK",
+                          "DA", "TL", "WIN", "UT",
+                          "CC", "M19", "EZ4", "VIT"),
+                 match = 49)
+PEL_data <- bind_rows(PEL_data, PEL_49)
+
+# match 50
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_50 <- tibble(placement_points = c(10, 5, 0, 6, 
+                                      0, 4, 0, 3, 
+                                      0, 1, 1, 2, 
+                                      0, 0, 0, 0),
+                 kill_points = c(9, 10, 2, 13, 
+                                 1, 3, 1, 3, 
+                                 2, 2, 2, 2, 
+                                 5, 2, 4, 0),
+                 team = c("FC", "RYE", "G2", "TSM", 
+                          "NIP", "NV", "REC", "PK",
+                          "DA", "TL", "WIN", "UT",
+                          "CC", "M19", "EZ4", "VIT"),
+                 match = 50)
+PEL_data <- bind_rows(PEL_data, PEL_50)
+
+# match 51
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_51 <- tibble(placement_points = c(0, 1, 4, 0, 
+                                      3, 5, 10, 2, 
+                                      6, 1, 0, 0, 
+                                      0, 0, 0, 0),
+                 kill_points = c(4, 3, 8, 3, 
+                                 2, 4, 8, 1, 
+                                 5, 9, 4, 4, 
+                                 2, 1, 0, 1),
+                 team = c("FC", "RYE", "G2", "TSM", 
+                          "NIP", "NV", "REC", "PK",
+                          "DA", "TL", "WIN", "UT",
+                          "CC", "M19", "EZ4", "VIT"),
+                 match = 51)
+PEL_data <- bind_rows(PEL_data, PEL_51)
+
+# match 52
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_52 <- tibble(placement_points = c(0, 5, 10, 3, 
+                                      6, 2, 0, 4, 
+                                      0, 0, 1, 0, 
+                                      1, 0, 0, 0),
+                 kill_points = c(4, 9, 13, 0, 
+                                 12, 6, 2, 4, 
+                                 0, 0, 6, 2, 
+                                 3, 0, 0, 0),
+                 team = c("FC", "RYE", "G2", "TSM", 
+                          "NIP", "NV", "REC", "PK",
+                          "DA", "TL", "WIN", "UT",
+                          "CC", "M19", "EZ4", "VIT"),
+                 match = 52)
+PEL_data <- bind_rows(PEL_data, PEL_52)
+
+# match 53
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_53 <- tibble(placement_points = c(5, 10, 6, 2, 
+                                      4, 0, 0, 3, 
+                                      0, 0, 1, 1, 
+                                      0, 0, 0, 0),
+                 kill_points = c(12, 15, 5, 4, 
+                                 3, 0, 1, 8, 
+                                 0, 0, 3, 4, 
+                                 0, 1, 2, 0),
+                 team = c("PK", "CC", "G2", "NV", 
+                          "DA", "WIN", "VIT", "TSM",
+                          "TL", "RYE", "REC", "M19",
+                          "EZ4", "UT", "FC", "NIP"),
+                 match = 53)
+PEL_data <- bind_rows(PEL_data, PEL_53)
+
+# match 54
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_54 <- tibble(placement_points = c(2, 0, 3, 6, 
+                                      0, 5, 0, 0, 
+                                      10, 1, 0, 4, 
+                                      0, 0, 1, 0),
+                 kill_points = c(4, 3, 4, 9, 
+                                 0, 7, 0, 1, 
+                                 8, 3, 7, 4, 
+                                 2, 2, 2, 4),
+                 team = c("PK", "CC", "G2", "NV", 
+                          "DA", "WIN", "VIT", "TSM",
+                          "TL", "RYE", "REC", "M19",
+                          "EZ4", "UT", "FC", "NIP"),
+                 match = 54)
+PEL_data <- bind_rows(PEL_data, PEL_54)
+
+# match 55
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_55 <- tibble(placement_points = c(4, 2, 0, 1, 
+                                      3, 0, 10, 5, 
+                                      0, 6, 0, 0, 
+                                      0, 0, 0, 1),
+                 kill_points = c(8, 4, 4, 6, 
+                                 2, 5, 11, 1, 
+                                 0, 3, 1, 0, 
+                                 1, 5, 4, 2),
+                 team = c("PK", "CC", "G2", "NV", 
+                          "DA", "WIN", "VIT", "TSM",
+                          "TL", "RYE", "REC", "M19",
+                          "EZ4", "UT", "FC", "NIP"),
+                 match = 55)
+PEL_data <- bind_rows(PEL_data, PEL_55)
+
+# match 56
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_56 <- tibble(placement_points = c(4, 1, 5, 2, 
+                                      10, 6, 1, 0, 
+                                      0, 0, 0, 0, 
+                                      3, 0, 0, 0),
+                 kill_points = c(7, 4, 8, 3, 
+                                 10, 7, 4, 1, 
+                                 0, 4, 3, 1, 
+                                 4, 1, 0, 2),
+                 team = c("PK", "CC", "G2", "NV", 
+                          "DA", "WIN", "VIT", "TSM",
+                          "TL", "RYE", "REC", "M19",
+                          "EZ4", "UT", "FC", "NIP"),
+                 match = 56)
+PEL_data <- bind_rows(PEL_data, PEL_56)
+
+# match 57
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_57 <- tibble(placement_points = c(6, 5, 0, 0, 
+                                      3, 0, 10, 0, 
+                                      0, 1, 4, 1, 
+                                      2, 0, 0, 0),
+                 kill_points = c(14, 8, 2, 5, 
+                                 8, 1, 3, 2, 
+                                 6, 4, 2, 2, 
+                                 2, 0, 3, 1),
+                 team = c("M19", "TL", "NV", "G2", 
+                          "PK", "NIP", "REC", "FC",
+                          "UT", "RYE", "DA", "CC",
+                          "WIN", "TSM", "EZ4", "VIT"),
+                 match = 57)
+PEL_data <- bind_rows(PEL_data, PEL_57)
+
+# match 58
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_58 <- tibble(placement_points = c(3, 0, 5, 10, 
+                                      0, 0, 0, 2, 
+                                      1, 6, 0, 1, 
+                                      0, 4, 0, 0),
+                 kill_points = c(7, 4, 5, 6, 
+                                 3, 1, 5, 3, 
+                                 5, 3, 1, 2, 
+                                 3, 3, 1, 0),
+                 team = c("M19", "TL", "NV", "G2", 
+                          "PK", "NIP", "REC", "FC",
+                          "UT", "RYE", "DA", "CC",
+                          "WIN", "TSM", "EZ4", "VIT"),
+                 match = 58)
+PEL_data <- bind_rows(PEL_data, PEL_58)
+
+# match 59
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_59 <- tibble(placement_points = c(1, 4, 6, 2, 
+                                      5, 10, 0, 0, 
+                                      0, 0, 1, 0, 
+                                      0, 0, 0, 3),
+                 kill_points = c(3, 11, 9, 5, 
+                                 5, 8, 1, 10, 
+                                 0, 0, 2, 1, 
+                                 0, 1, 1, 1),
+                 team = c("M19", "TL", "NV", "G2", 
+                          "PK", "NIP", "REC", "FC",
+                          "UT", "RYE", "DA", "CC",
+                          "WIN", "TSM", "EZ4", "VIT"),
+                 match = 59)
+PEL_data <- bind_rows(PEL_data, PEL_59)
+
+# match 60
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_5
+PEL_60 <- tibble(placement_points = c(10, 6, 5, 0, 
+                                      0, 0, 0, 2, 
+                                      1, 0, 3, 4, 
+                                      1, 0, 0, 0),
+                 kill_points = c(12, 10, 8, 1, 
+                                 2, 2, 2, 1, 
+                                 5, 3, 2, 3, 
+                                 3, 2, 3, 3),
+                 team = c("M19", "TL", "NV", "G2", 
+                          "PK", "NIP", "REC", "FC",
+                          "UT", "RYE", "DA", "CC",
+                          "WIN", "TSM", "EZ4", "VIT"),
+                 match = 60)
+PEL_data <- bind_rows(PEL_data, PEL_60)
+
+# match 61
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_61 <- tibble(placement_points = c(10, 0, 6, 2, 
+                                      4, 3, 0, 1, 
+                                      0, 0, 5, 0, 
+                                      1, 0, 0, 0),
+                 kill_points = c(10, 1, 7, 6, 
+                                 3, 2, 3, 3, 
+                                 4, 3, 6, 0, 
+                                 4, 1, 3, 2),
+                 team = c("WIN", "TL", "TSM", "UT", 
+                          "NV", "G2", "FC", "NIP",
+                          "REC", "EZ4", "RYE", "M19",
+                          "DA", "CC", "PK", "VIT"),
+                 match = 61)
+PEL_data <- bind_rows(PEL_data, PEL_61)
+
+# match 62
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_62 <- tibble(placement_points = c(10, 1, 3, 0, 
+                                      4, 0, 0, 6, 
+                                      1, 0, 0, 2, 
+                                      5, 0, 0, 0),
+                 kill_points = c(7, 8, 3, 2, 
+                                 4, 6, 2, 10, 
+                                 5, 1, 1, 1, 
+                                 3, 4, 1, 0),
+                 team = c("WIN", "TL", "TSM", "UT", 
+                          "NV", "G2", "FC", "NIP",
+                          "REC", "EZ4", "RYE", "M19",
+                          "DA", "CC", "PK", "VIT"),
+                 match = 62)
+PEL_data <- bind_rows(PEL_data, PEL_62)
+
+# match 63
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_63 <- tibble(placement_points = c(5, 3, 1, 0, 
+                                      4, 6, 10, 0, 
+                                      2, 0, 0, 0, 
+                                      0, 0, 0, 1),
+                 kill_points = c(4, 13, 2, 1, 
+                                 7, 6, 8, 0, 
+                                 2, 5, 3, 2, 
+                                 0, 1, 2, 3),
+                 team = c("WIN", "TL", "TSM", "UT", 
+                          "NV", "G2", "FC", "NIP",
+                          "REC", "EZ4", "RYE", "M19",
+                          "DA", "CC", "PK", "VIT"),
+                 match = 63)
+PEL_data <- bind_rows(PEL_data, PEL_63)
+
+# match 64
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_64 <- tibble(placement_points = c(5, 6, 3, 10, 
+                                      1, 2, 0, 0, 
+                                      4, 0, 0, 1, 
+                                      0, 0, 0, 0),
+                 kill_points = c(4, 11, 9, 9, 
+                                 2, 3, 0, 2, 
+                                 4, 8, 1, 7, 
+                                 0, 1, 1, 0),
+                 team = c("WIN", "TL", "TSM", "UT", 
+                          "NV", "G2", "FC", "NIP",
+                          "REC", "EZ4", "RYE", "M19",
+                          "DA", "CC", "PK", "VIT"),
+                 match = 64)
+PEL_data <- bind_rows(PEL_data, PEL_64)
+
+# match 65
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_65 <- tibble(placement_points = c(0, 4, 0, 0, 
+                                      5, 1, 10, 2, 
+                                      1, 0, 0, 6, 
+                                      0, 3, 0, 0),
+                 kill_points = c(3, 3, 3, 2, 
+                                 11, 5, 10, 2, 
+                                 4, 0, 1, 2, 
+                                 7, 3, 0, 3),
+                 team = c("NV", "RYE", "CC", "PK", 
+                          "G2", "FC", "VIT", "REC",
+                          "WIN", "TL", "EZ4", "UT",
+                          "NIP", "M19", "DA", "TSM"),
+                 match = 65)
+PEL_data <- bind_rows(PEL_data, PEL_65)
+
+# match 66
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_66 <- tibble(placement_points = c(6, 10, 0, 2, 
+                                      0, 4, 0, 0, 
+                                      5, 1, 0, 1, 
+                                      0, 0, 3, 0),
+                 kill_points = c(10, 8, 0, 10, 
+                                 1, 5, 3, 4, 
+                                 3, 5, 3, 1, 
+                                 2, 1, 2, 1),
+                 team = c("NV", "RYE", "CC", "PK", 
+                          "G2", "FC", "VIT", "REC",
+                          "WIN", "TL", "EZ4", "UT",
+                          "NIP", "M19", "DA", "TSM"),
+                 match = 66)
+PEL_data <- bind_rows(PEL_data, PEL_66)
+
+# match 67
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_67 <- tibble(placement_points = c(0, 0, 10, 1, 
+                                      2, 0, 0, 6, 
+                                      0, 5, 3, 0, 
+                                      0, 4, 0, 1),
+                 kill_points = c(2, 2, 14, 3, 
+                                 4, 1, 0, 7, 
+                                 4, 7, 1, 3, 
+                                 1, 2, 6, 2),
+                 team = c("NV", "RYE", "CC", "PK", 
+                          "G2", "FC", "VIT", "REC",
+                          "WIN", "TL", "EZ4", "UT",
+                          "NIP", "M19", "DA", "TSM"),
+                 match = 67)
+PEL_data <- bind_rows(PEL_data, PEL_67)
+
+# match 68
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_68 <- tibble(placement_points = c(10, 3, 0, 5, 
+                                      6, 2, 0, 0, 
+                                      0, 0, 4, 0, 
+                                      1, 0, 0, 1),
+                 kill_points = c(7, 8, 6, 9, 
+                                 3, 8, 1, 2, 
+                                 2, 0, 6, 2, 
+                                 3, 1, 0, 2),
+                 team = c("NV", "RYE", "CC", "PK", 
+                          "G2", "FC", "VIT", "REC",
+                          "WIN", "TL", "EZ4", "UT",
+                          "NIP", "M19", "DA", "TSM"),
+                 match = 68)
+PEL_data <- bind_rows(PEL_data, PEL_68)
+
+# match 69
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_69 <- tibble(placement_points = c(6, 10, 0, 2, 
+                                      0, 0, 3, 0, 
+                                      4, 5, 1, 0, 
+                                      0, 0, 1, 0),
+                 kill_points = c(10, 10, 4, 1, 
+                                 2, 4, 8, 1, 
+                                 5, 5, 1, 1, 
+                                 1, 3, 2, 1),
+                 team = c("NV", "G2", "DA", "TSM", 
+                          "TL", "UT", "CC", "FC",
+                          "WIN", "REC", "PK", "RYE",
+                          "EZ4", "NIP", "VIT", "M19"),
+                 match = 69)
+PEL_data <- bind_rows(PEL_data, PEL_69)
+
+# match 70
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_70 <- tibble(placement_points = c(0, 10, 1, 0, 
+                                      4, 0, 0, 5, 
+                                      2, 0, 0, 3, 
+                                      6, 0, 1, 0),
+                 kill_points = c(1, 7, 6, 3, 
+                                 0, 0, 4, 10, 
+                                 8, 2, 0, 6, 
+                                 4, 5, 0, 1),
+                 team = c("NV", "G2", "DA", "TSM", 
+                          "TL", "UT", "CC", "FC",
+                          "WIN", "REC", "PK", "RYE",
+                          "EZ4", "NIP", "VIT", "M19"),
+                 match = 70)
+PEL_data <- bind_rows(PEL_data, PEL_70)
+
+# match 71
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_71 <- tibble(placement_points = c(5, 0, 6, 2, 
+                                      3, 10, 0, 0, 
+                                      1, 0, 4, 1, 
+                                      0, 0, 0, 0),
+                 kill_points = c(9, 1, 10, 4, 
+                                 8, 8, 4, 1, 
+                                 2, 2, 3, 1, 
+                                 0, 1, 3, 2),
+                 team = c("NV", "G2", "DA", "TSM", 
+                          "TL", "UT", "CC", "FC",
+                          "WIN", "REC", "PK", "RYE",
+                          "EZ4", "NIP", "VIT", "M19"),
+                 match = 71)
+PEL_data <- bind_rows(PEL_data, PEL_71)
+
+# match 72
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_6
+PEL_72 <- tibble(placement_points = c(5, 1, 4, 10, 
+                                      6, 0, 0, 1, 
+                                      0, 3, 2, 0, 
+                                      0, 0, 0, 0),
+                 kill_points = c(9, 4, 2, 8, 
+                                 5, 4, 3, 4, 
+                                 0, 1, 3, 1, 
+                                 2, 1, 2, 4),
+                 team = c("NV", "G2", "DA", "TSM", 
+                          "TL", "UT", "CC", "FC",
+                          "WIN", "REC", "PK", "RYE",
+                          "EZ4", "NIP", "VIT", "M19"),
+                 match = 72)
+PEL_data <- bind_rows(PEL_data, PEL_72)
+
+# match 73
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_73 <- tibble(placement_points = c(10, 5, 0, 0, 
+                                      2, 6, 0, 0, 
+                                      3, 1, 0, 0, 
+                                      4, 0, 1, 0),
+                 kill_points = c(12, 6, 2, 0, 
+                                 9, 7, 2, 0, 
+                                 3, 0, 1, 1, 
+                                 8, 1, 3, 1),
+                 team = c("M19", "FC", "VIT", "TSM", 
+                          "TL", "NV", "REC", "PK",
+                          "NIP", "RYE", "EZ4", "G2",
+                          "DA", "CC", "WIN", "UT"),
+                 match = 73)
+PEL_data <- bind_rows(PEL_data, PEL_73)
+
+# match 74
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_74 <- tibble(placement_points = c(0, 3, 5, 2, 
+                                      0, 0, 1, 1, 
+                                      6, 4, 0, 10, 
+                                      0, 0, 0, 0),
+                 kill_points = c(4, 7, 5, 7, 
+                                 1, 4, 4, 4, 
+                                 6, 4, 0, 6, 
+                                 2, 0, 1, 2),
+                 team = c("M19", "FC", "VIT", "TSM", 
+                          "TL", "NV", "REC", "PK",
+                          "NIP", "RYE", "EZ4", "G2",
+                          "DA", "CC", "WIN", "UT"),
+                 match = 74)
+PEL_data <- bind_rows(PEL_data, PEL_74)
+
+# match 75
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_75 <- tibble(placement_points = c(2, 6, 0, 1, 
+                                      0, 0, 5, 0, 
+                                      0, 3, 10, 0, 
+                                      0, 4, 1, 0),
+                 kill_points = c(6, 8, 1, 7, 
+                                 0, 4, 6, 2, 
+                                 0, 9, 9, 1, 
+                                 0, 5, 0, 1),
+                 team = c("M19", "FC", "VIT", "TSM", 
+                          "TL", "NV", "REC", "PK",
+                          "NIP", "RYE", "EZ4", "G2",
+                          "DA", "CC", "WIN", "UT"),
+                 match = 75)
+PEL_data <- bind_rows(PEL_data, PEL_75)
+
+# match 76
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_76 <- tibble(placement_points = c(2, 0, 10, 5, 
+                                      4, 1, 3, 6, 
+                                      0, 0, 0, 0, 
+                                      1, 0, 0, 0),
+                 kill_points = c(3, 1, 11, 6, 
+                                 9, 3, 3, 10, 
+                                 5, 1, 0, 1, 
+                                 0, 4, 0, 0),
+                 team = c("M19", "FC", "VIT", "TSM", 
+                          "TL", "NV", "REC", "PK",
+                          "NIP", "RYE", "EZ4", "G2",
+                          "DA", "CC", "WIN", "UT"),
+                 match = 76)
+PEL_data <- bind_rows(PEL_data, PEL_76)
+
+# match 77
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_77 <- tibble(placement_points = c(5, 0, 4, 6, 
+                                      10, 3, 0, 0, 
+                                      2, 0, 0, 1, 
+                                      0, 1, 0, 0),
+                 kill_points = c(9, 4, 5, 4, 
+                                 16, 3, 3, 0, 
+                                 6, 0, 0, 1, 
+                                 1, 1, 2, 4),
+                 team = c("VIT", "PK", "EZ4", "TL", 
+                          "G2", "FC", "NIP", "TSM",
+                          "UT", "WIN", "REC", "DA",
+                          "CC", "NV", "M19", "RYE"),
+                 match = 77)
+PEL_data <- bind_rows(PEL_data, PEL_77)
+
+# match 78
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_78 <- tibble(placement_points = c(0, 4, 10, 0, 
+                                      0, 1, 1, 5, 
+                                      0, 6, 0, 3, 
+                                      0, 2, 0, 0),
+                 kill_points = c(1, 6, 4, 5, 
+                                 0, 4, 7, 9, 
+                                 3, 8, 2, 5, 
+                                 1, 3, 0, 1),
+                 team = c("VIT", "PK", "EZ4", "TL", 
+                          "G2", "FC", "NIP", "TSM",
+                          "UT", "WIN", "REC", "DA",
+                          "CC", "NV", "M19", "RYE"),
+                 match = 78)
+PEL_data <- bind_rows(PEL_data, PEL_78)
+
+# match 79
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_79 <- tibble(placement_points = c(10, 0, 0, 1, 
+                                      0, 6, 3, 1, 
+                                      5, 2, 4, 0, 
+                                      0, 0, 0, 0),
+                 kill_points = c(11, 0, 6, 2, 
+                                 0, 2, 8, 4, 
+                                 6, 4, 10, 0, 
+                                 0, 2, 4, 0),
+                 team = c("VIT", "PK", "EZ4", "TL", 
+                          "G2", "FC", "NIP", "TSM",
+                          "UT", "WIN", "REC", "DA",
+                          "CC", "NV", "M19", "RYE"),
+                 match = 79)
+PEL_data <- bind_rows(PEL_data, PEL_79)
+
+# match 80
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_80 <- tibble(placement_points = c(0, 10, 3, 5, 
+                                      0, 4, 1, 0, 
+                                      0, 1, 0, 2, 
+                                      6, 0, 0, 0),
+                 kill_points = c(3, 10, 1, 6, 
+                                 1, 4, 3, 5, 
+                                 2, 2, 4, 5, 
+                                 7, 3, 2, 1),
+                 team = c("VIT", "PK", "EZ4", "TL", 
+                          "G2", "FC", "NIP", "TSM",
+                          "UT", "WIN", "REC", "DA",
+                          "CC", "NV", "M19", "RYE"),
+                 match = 80)
+PEL_data <- bind_rows(PEL_data, PEL_80)
+
+# match 81
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_81 <- tibble(placement_points = c(0, 10, 5, 0, 
+                                      3, 0, 6, 0, 
+                                      0, 1, 2, 0, 
+                                      0, 0, 1, 4),
+                 kill_points = c(4, 13, 4, 1, 
+                                 4, 0, 8, 0, 
+                                 1, 3, 7, 3, 
+                                 0, 2, 4, 1),
+                 team = c("EZ4", "NIP", "FC", "CC", 
+                          "M19", "REC", "VIT", "TL",
+                          "G2", "RYE", "UT", "TSM",
+                          "PK", "NV", "WIN", "DA"),
+                 match = 81)
+PEL_data <- bind_rows(PEL_data, PEL_81)
+
+# match 82
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_82 <- tibble(placement_points = c(6, 0, 10, 5, 
+                                      1, 0, 1, 3, 
+                                      0, 0, 0, 0, 
+                                      4, 0, 0, 2),
+                 kill_points = c(5, 1, 13, 7, 
+                                 5, 2, 1, 9, 
+                                 7, 1, 4, 0, 
+                                 2, 1, 2, 0),
+                 team = c("EZ4", "NIP", "FC", "CC", 
+                          "M19", "REC", "VIT", "TL",
+                          "G2", "RYE", "UT", "TSM",
+                          "PK", "NV", "WIN", "DA"),
+                 match = 82)
+PEL_data <- bind_rows(PEL_data, PEL_82)
+
+# match 83
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_83 <- tibble(placement_points = c(3, 6, 0, 2, 
+                                      5, 10, 0, 0, 
+                                      1, 0, 0, 4, 
+                                      0, 1, 0, 0),
+                 kill_points = c(6, 6, 1, 6, 
+                                 5, 12, 0, 0,
+                                 8, 7, 1, 4, 
+                                 3, 1, 1, 0),
+                 team = c("EZ4", "NIP", "FC", "CC", 
+                          "M19", "REC", "VIT", "TL",
+                          "G2", "RYE", "UT", "TSM",
+                          "PK", "NV", "WIN", "DA"),
+                 match = 83)
+PEL_data <- bind_rows(PEL_data, PEL_83)
+
+# match 84
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_7
+PEL_84 <- tibble(placement_points = c(10, 4, 0, 6, 
+                                      1, 3, 0, 5, 
+                                      0, 1, 0, 0, 
+                                      2, 0, 0, 0),
+                 kill_points = c(10, 2, 8, 8, 
+                                 9, 0, 7, 4, 
+                                 3, 2, 0, 2, 
+                                 1, 4, 0, 0),
+                 team = c("EZ4", "NIP", "FC", "CC", 
+                          "M19", "REC", "VIT", "TL",
+                          "G2", "RYE", "UT", "TSM",
+                          "PK", "NV", "WIN", "DA"),
+                 match = 84)
+PEL_data <- bind_rows(PEL_data, PEL_84)
+
+# match 85
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_85 <- tibble(placement_points = c(10, 5, 6, 1, 
+                                      0, 0, 2, 4, 
+                                      0, 1, 0, 0, 
+                                      0, 0, 0, 3),
+                 kill_points = c(13, 0, 5, 7, 
+                                 7, 0, 3, 10, 
+                                 3, 2, 0, 1, 
+                                 5, 0, 0, 3),
+                 team = c("REC", "G2", "EZ4", "TL", 
+                          "PK", "DA", "CC", "RYE",
+                          "WIN", "UT", "NV", "VIT",
+                          "FC", "TSM", "NIP", "M19"),
+                 match = 85)
+PEL_data <- bind_rows(PEL_data, PEL_85)
+
+# match 86
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_86 <- tibble(placement_points = c(0, 0, 0, 0, 
+                                      5, 10, 0, 3, 
+                                      0, 6, 4, 2, 
+                                      0, 1, 1, 0),
+                 kill_points = c(4, 0, 1, 10, 
+                                 8, 6, 1, 8, 
+                                 0, 6, 1, 3, 
+                                 4, 2, 3, 1),
+                 team = c("REC", "G2", "EZ4", "TL", 
+                          "PK", "DA", "CC", "RYE",
+                          "WIN", "UT", "NV", "VIT",
+                          "FC", "TSM", "NIP", "M19"),
+                 match = 86)
+PEL_data <- bind_rows(PEL_data, PEL_86)
+
+# match 87
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_87 <- tibble(placement_points = c(4, 10, 1, 3, 
+                                      6, 5, 0, 0, 
+                                      2, 0, 0, 1, 
+                                      0, 0, 0, 0),
+                 kill_points = c(4, 8, 7, 1, 
+                                 2, 9, 5, 0, 
+                                 5, 1, 1, 6, 
+                                 2, 2, 5, 0),
+                 team = c("REC", "G2", "EZ4", "TL", 
+                          "PK", "DA", "CC", "RYE",
+                          "WIN", "UT", "NV", "VIT",
+                          "FC", "TSM", "NIP", "M19"),
+                 match = 87)
+PEL_data <- bind_rows(PEL_data, PEL_87)
+
+# match 88
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_88 <- tibble(placement_points = c(1, 2, 6, 1, 
+                                      0, 0, 5, 0, 
+                                      10, 0, 3, 0, 
+                                      0, 4, 0, 0),
+                 kill_points = c(2, 8, 6, 8, 
+                                 2, 0, 12, 2, 
+                                 7, 3, 5, 0, 
+                                 1, 2, 1, 2),
+                 team = c("REC", "G2", "EZ4", "TL", 
+                          "PK", "DA", "CC", "RYE",
+                          "WIN", "UT", "NV", "VIT",
+                          "FC", "TSM", "NIP", "M19"),
+                 match = 88)
+PEL_data <- bind_rows(PEL_data, PEL_88)
+
+# match 89
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_89 <- tibble(placement_points = c(0, 1, 4, 10, 
+                                      2, 3, 0, 5, 
+                                      6, 0, 0, 0, 
+                                      1, 0, 0, 0),
+                 kill_points = c(5, 3, 6, 14, 
+                                 1, 1, 2, 0, 
+                                 9, 3, 4, 3, 
+                                 2, 4, 0, 0),
+                 team = c("EZ4", "DA", "CC", "TSM", 
+                          "REC", "VIT", "FC", "NIP",
+                          "TL", "WIN", "M19", "PK",
+                          "G2", "NV", "RYE", "UT"),
+                 match = 89)
+PEL_data <- bind_rows(PEL_data, PEL_89)
+
+# match 90
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_90 <- tibble(placement_points = c(10, 4, 0, 0, 
+                                      0, 5, 0, 2, 
+                                      0, 1, 6, 0, 
+                                      0, 1, 0, 3),
+                 kill_points = c(13, 0, 2, 3, 
+                                 2, 9, 0, 8, 
+                                 1, 1, 6, 3, 
+                                 0, 1, 6, 3),
+                 team = c("EZ4", "DA", "CC", "TSM", 
+                          "REC", "VIT", "FC", "NIP",
+                          "TL", "WIN", "M19", "PK",
+                          "G2", "NV", "RYE", "UT"),
+                 match = 90)
+PEL_data <- bind_rows(PEL_data, PEL_90)
+
+# match 91
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_91 <- tibble(placement_points = c(4, 6, 3, 0, 
+                                      1, 2, 10, 0, 
+                                      1, 0, 0, 5, 
+                                      0, 0, 0, 0),
+                 kill_points = c(6, 7, 4, 2, 
+                                 9, 5, 8, 4, 
+                                 5, 0, 0, 4, 
+                                 4, 0, 0, 1),
+                 team = c("EZ4", "DA", "CC", "TSM", 
+                          "REC", "VIT", "FC", "NIP",
+                          "TL", "WIN", "M19", "PK",
+                          "G2", "NV", "RYE", "UT"),
+                 match = 91)
+PEL_data <- bind_rows(PEL_data, PEL_91)
+
+# match 92
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_92 <- tibble(placement_points = c(0, 6, 5, 0, 
+                                      3, 0, 1, 0, 
+                                      0, 10, 0, 1, 
+                                      4, 2, 0, 0),
+                 kill_points = c(1, 10, 9, 2, 
+                                 9, 1, 3, 4, 
+                                 0, 7, 2, 1, 
+                                 5, 6, 2, 0),
+                 team = c("EZ4", "DA", "CC", "TSM", 
+                          "REC", "VIT", "FC", "NIP",
+                          "TL", "WIN", "M19", "PK",
+                          "G2", "NV", "RYE", "UT"),
+                 match = 92)
+PEL_data <- bind_rows(PEL_data, PEL_92)
+
+# match 93
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_93 <- tibble(placement_points = c(10, 1, 3, 5, 
+                                      0, 0, 4, 0, 
+                                      6, 0, 1, 0, 
+                                      0, 2, 0, 0),
+                 kill_points = c(9, 15, 7, 2, 
+                                 0, 2, 4, 0, 
+                                 7, 1, 2, 2, 
+                                 5, 2, 2, 0),
+                 team = c("PK", "CC", "FC", "REC", 
+                          "NIP", "TSM", "VIT", "NV",
+                          "TL", "RYE", "EZ4", "DA",
+                          "UT", "G2", "WIN", "M19"),
+                 match = 93)
+PEL_data <- bind_rows(PEL_data, PEL_93)
+
+# match 94
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_94 <- tibble(placement_points = c(10, 4, 0, 1, 
+                                      5, 0, 0, 3, 
+                                      0, 6, 1, 2, 
+                                      0, 0, 0, 0),
+                 kill_points = c(12, 12, 0, 6, 
+                                 7, 5, 1, 0, 
+                                 0, 6, 0, 6, 
+                                 1, 3, 0, 0),
+                 team = c("PK", "CC", "FC", "REC", 
+                          "NIP", "TSM", "VIT", "NV",
+                          "TL", "RYE", "EZ4", "DA",
+                          "UT", "G2", "WIN", "M19"),
+                 match = 94)
+PEL_data <- bind_rows(PEL_data, PEL_94)
+
+# match 95
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_95 <- tibble(placement_points = c(4, 1, 10, 5, 
+                                      2, 6, 0, 1,
+                                      0, 3, 0, 0, 
+                                      0, 0, 0, 0),
+                 kill_points = c(9, 4, 0, 7, 
+                                 7, 7, 3, 3, 
+                                 0, 1, 5, 0, 
+                                 1, 1, 1, 1),
+                 team = c("PK", "CC", "FC", "REC", 
+                          "NIP", "TSM", "VIT", "NV",
+                          "TL", "RYE", "EZ4", "DA",
+                          "UT", "G2", "WIN", "M19"),
+                 match = 95)
+PEL_data <- bind_rows(PEL_data, PEL_95)
+
+# match 96
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2/Week_8
+PEL_96 <- tibble(placement_points = c(10, 0, 5, 1, 
+                                      0, 0, 3, 6, 
+                                      0, 0, 1, 2, 
+                                      4, 0, 0, 0),
+                 kill_points = c(11, 1, 9, 4, 
+                                 3, 2, 7, 6, 
+                                 4, 0, 4, 2, 
+                                 3, 0, 2, 3),
+                 team = c("PK", "CC", "FC", "REC", 
+                          "NIP", "TSM", "VIT", "NV",
+                          "TL", "RYE", "EZ4", "DA",
+                          "UT", "G2", "WIN", "M19"),
+                 match = 96)
+PEL_data <- bind_rows(PEL_data, PEL_96)
+
+glimpse(PEL_data)
+
+# calculate total points, cumulative points, and cumulative average points per match
+
+PEL_data %<>%
+  mutate(points = placement_points + kill_points) %>%
+  group_by(team) %>%
+  mutate(cumulative_points = cumsum(points)) %>%
+  mutate(cumulative_avg_points = cumulative_points / match) %>%
+  ungroup()
+
+print(PEL_data, n = 200) # verify cumulative average is correct
+ 
+```
+
+&#x200B;
+
+Phase 2 of PUBG Europe League has wrapped up after a tense final weekend. I thought I'd share an overview of **how each team performed throughout the phase.**
+
+&#x200B;
+
+**TRENDS IN THE STANDINGS**
+
+&#x200B;
+
+Similarly to how I plotted [trends in the standings over NPL Phase 2](https://pubgdataviz.netlify.com/post/2019-06-14-phase-2-overview/), I made an **interactive tool to look at each team’s results over PEL Phase 2.**
+
+I cropped this plotly visualization fairly tightly so there's more detail visible for the last few weeks, but zoom out with the controls in the upper right to see the chaos at the beginning of the phase, with G2 and CrowCrowd having great matches to start out, and Team Liquid bouncing back from a zero-point match with a 20-point win. 
+
+Hover over the colored lines in the plot to see **details for how each team's average points changed with each match.** Use the pan tool to move around. Double click on a team name in the legend to **isolate that team's trendline**, and single click to **add or remove other teams’ trendlines to compare**. Double click again or press the home button in the upper right to restore the plot to defaults.
+
+&#x200B;
+
+``` {r time_series, echo = FALSE, message = FALSE, fig.keep = 'all', fig.height = 6, fig.width = 8}
+
+PEL_data$team <- factor(PEL_data$team, levels = c("FC", "NV", "TL", "G2", 
+                                               "PK", "TSM", "CC", "NIP", 
+                                               "RYE", "DA", "EZ4", "WIN", 
+                                               "REC", "VIT", "M19", "UT"))
+team_colors <- c("tomato3", "yellow", "dodgerblue4", "brown4",
+                 "darkgoldenrod4", "black", "lightseagreen", "cornsilk4", #darkturquoise? #peachpuff4?
+                 "chocolate2", "deepskyblue4", "burlywood4", "deeppink3", 
+                 "orangered4", "gold3", "red3", "turquoise4")
+
+p <- ggplot(PEL_data,
+       aes(x = match, 
+           y = cumulative_avg_points,
+           colour = team,
+           group = team,
+           text = sprintf('Match: %s\nCumulative Average Points: %s\nTeam: %s', 
+                          PEL_data$match, 
+                          round(PEL_data$cumulative_avg_points, 
+                                digits = 3),
+                          PEL_data$team))) +
+       geom_line(size = 0.7) +
+  labs(x = "Match", 
+       y = "Cumulative Average Points per Match") +
+  scale_x_continuous(limit = c(1, 96),
+                     expand = c(0, 0)) +
+  scale_y_continuous(limit = c(0, 24),
+                     expand = c(0, 0)) +
+  coord_cartesian(xlim = c(1, 96),
+                  ylim = c(3, 9)) +
+  scale_colour_manual(values = team_colors) +
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica"),
+        legend.title = element_blank())
+
+pl <- ggplotly(p, tooltip = "text") %>%
+  layout(hoverlabel = list(bgcolor = "white",
+                           font = list(family = "Helvetica",
+                                       size = 11,
+                                       color = "gray10"))) %>%
+  add_annotations(text = "Team", xref = "paper", yref = "paper",
+                  x = 1.02, xanchor = "left",
+                  y = 0.985, yanchor = "top",
+                  legendtitle = TRUE, showarrow = FALSE) %>%
+  layout(legend = list(y = 0.94, yanchor = "top"))
+
+pl
+
+```
+
+&#x200B;
+
+^*Figure 1: Interactive plot of team performance over the course of PEL Phase 2.*^
+
+&#x200B;
+
+"Cumulative average points" refers to a team’s total standings points after a given match divided by the number of matches (average points), incremented over the increasing number of matches as time goes on (cumulatively). If I graphed total points over time, the plot would be this same mess but all in a diagonal line, so essentially **I just divided the ongoing points totals by the number of matches to make the plot more horizontal and easier to read.**
+
+**The relative position of each team is accurate for each day’s results**, so you can see how the standings change over time.
+
+It's clear from this plot that **the top teams separated out fairly early on**, although Team SoloMid slowly declined starting around the halfway point, making the contest for 5^th^ place more exciting near the end. 
+
+Speaking of the end, **Pittsburgh Knights had an incredible 75-point performance in the final weekend to just barely take over that 5^th^ place spot**.
+
+The top four teams shifted around over the final few matches as well, with Team Liquid and G2 declining slightly from their previous average performance, and Natus Vincere and FaZe Clan criss-crossing several times (zoom in on these four teams at the end to see more detail). FaZe had two good matches in a row right at the end to seal their first-place finish. 
+
+NV seemed to have a steady drop in performance from match 73 on, while the other top teams were a bit more consistent.
+
+in the lower half of the standings, CrowCrowd had a chaotic Phase 2, bumping up their average with a few great matches (53, 67). ENCE declined to a low point at match 74 and improved from there, and Vitality turned things around from there as well. Reciprocity continuously improved throughout the phase.
+
+&#x200B;
+
+**PARITY UPDATE**
+
+&#x200B;
+
+Now that Phase 2 of PEL and PEL-C is are complete, I've created an updated visualization of the parity metric I described in [my previous post](https://pubgdataviz.netlify.com/post/2019-07-03-parity/). If you missed it, **parity is the level of fairness or competitiveness in a league**. High parity means teams are more similar in terms of skill, and have a more equal chance of winning, which makes predicting the results more difficult.
+
+``` {r parity_data_setup, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# create a dataset containing the points spreads from all phases of all leagues internationally
+
+# Taiwan: Master League 2019 - Phase 1: Finals 
+# https://liquipedia.net/pubg/PUBG_Master_League/2019/Phase_1
+ML1_finals_parity <- tibble(points = c(135, 133, 122, 100,
+                                       100, 96, 94, 94,
+                                       86, 71, 66, 62,
+                                       55, 55, 45, 41),
+                            phase = "ML1") # 15 matches 
+# can't include the regular season because the league has 24 teams and a completely different format from other leagues
+# so to have a good comparison i'm using only the finals with 16 teams
+# although using the finals with only 15 matches introduces high variability with phase length... i wonder if parity is correlated with phase length (probably smh)
+
+# start the global dataset
+global_parity <- ML1_finals_parity
+
+# Taiwan: Master League 2019 - Phase 2: Finals 
+# https://liquipedia.net/pubg/PUBG_Master_League/2019/Phase_2
+# not done until July 7
+
+# AU & NZ: ESL AU & NZ Championship 2019 - Phase 1
+# https://liquipedia.net/pubg/ESL/ANZ_Championship/Phase_1
+ANZ1_parity <- tibble(points = c(386, 374, 208, 192, 
+                                    183, 173, 170, 160, 
+                                    160, 157, 137, 123, 
+                                    118, 113, 111, 101),
+                      phase = "ANZ1") # 32 matches
+global_parity <- bind_rows(global_parity, ANZ1_parity)
+
+# AU & NZ: ESL AU & NZ Championship 2019 - Phase 2
+# https://liquipedia.net/pubg/ESL/ANZ_Championship/Phase_2
+ANZ2_parity <- tibble(points = c(540, 322, 293, 263,
+                                     253, 233, 226, 214,
+                                     204, 203, 199, 197,
+                                     156, 124, 98, 90),
+                      phase = "ANZ2") # 40 matches 
+global_parity <- bind_rows(global_parity, ANZ2_parity)
+
+# PUBG Southeast Asia Championship 2019 - Phase 1
+# https://liquipedia.net/pubg/PUBG_Southeast_Asia_Championship/2019/Phase_1
+PSC1_parity <- tibble(points = c(124, 114, 103, 94, 
+                                 93, 81, 76, 76, 
+                                 51, 49, 46, 44, 
+                                 42, 37, 31, 30),
+                      phase = "PSC1") # 12 matches
+global_parity <- bind_rows(global_parity, PSC1_parity)
+
+# PUBG Southeast Asia Championship 2019 - Phase 2
+# https://liquipedia.net/pubg/PUBG_Southeast_Asia_Championship/2019/Phase_2
+PSC2_parity <- tibble(points = c(139, 104, 93, 93,
+                                 84, 64, 64, 63, 
+                                 59, 59, 57, 52,
+                                 50, 46, 38, 30),
+                      phase = "PSC2") # 12 matches
+global_parity <- bind_rows(global_parity, PSC2_parity)
+
+# PUBG Korea League 2019
+# can't include because the league has 24 teams and a completely different format from other leagues
+
+# PUBG Korea Contenders 2019 - Phase 1
+# https://liquipedia.net/pubg/PUBG_Korea_Contenders/2019/Phase_1
+PKC1_parity <- tibble(points = c(579, 395, 345, 319, 
+                                 296, 260, 251, 248, 
+                                 248, 245, 240, 219, 
+                                 205, 200, 199, 80),
+                      phase = "PKC1") # 48 matches
+global_parity <- bind_rows(global_parity, PKC1_parity)
+
+# PUBG Korea Contenders 2019 - Phase 2
+# https://liquipedia.net/pubg/PUBG_Korea_Contenders/2019/Phase_2
+# not done until July 7
+
+# ESL LA League: Season 2
+# ~ Phase 1
+# https://liquipedia.net/pubg/ESL/LA_League/Season_2
+LA1_parity <- tibble(points = c(294, 210, 194, 186, 
+                                172, 170, 166, 127, 
+                                105, 93, 88, 84, 
+                                72, 72, 57, 52),
+                     phase = "LA1") # 24 matches
+global_parity <- bind_rows(global_parity, LA1_parity)
+
+# ESL LA League: Season 3
+# ~ Phase 2
+# https://liquipedia.net/pubg/ESL/LA_League/Season_3
+LA2_parity <- tibble(points = c(209, 180, 146, 142,
+                                126, 126, 117, 112,
+                                107, 98, 94, 77,
+                                72, 63, 63, 61),
+                     phase = "LA2") # 24 matches
+global_parity <- bind_rows(global_parity, LA2_parity)
+
+# PUBG JAPAN SERIES Season 2: Grade 1 - Phase 1
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_2/Phase_1/Grade_1
+# essentially the first half of global phase 1
+PJS1_1_parity <- tibble(points = c(110, 99, 97, 88, 
+                                   79, 79, 78, 76, 
+                                   71, 64, 50, 46, 
+                                   40, 40, 36, 33),
+                        phase = "PJS1") # 12 matches
+global_parity <- bind_rows(global_parity, PJS1_1_parity)
+
+# PUBG JAPAN SERIES Season 2: Grade 1 - Phase 2
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_2/Phase_2/Grade_1
+# second half of global phase 1
+PJS1_2_parity <- tibble(points = c(103, 96, 92, 92, 
+                                   91, 84, 75, 70, 
+                                   66, 63, 54, 50, 
+                                   46, 41, 36, 29),
+                        phase = "PJS2") # 12 matches
+global_parity <- bind_rows(global_parity, PJS1_2_parity)
+
+# PUBG JAPAN SERIES Season 3: Grade 1 - Phase 1
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_3/Phase_1/Grade_1
+# first half of global phase 2
+PJS2_1_parity <- tibble(points = c(133, 108, 90, 90,
+                                   80, 68, 67, 64, 
+                                   64, 61, 56, 50,
+                                   38, 36, 35, 28),
+                        phase = "PJS3") # 12 matches
+global_parity <- bind_rows(global_parity, PJS2_1_parity)
+
+# PUBG JAPAN SERIES Season 3: Grade 1 - Phase 1
+# second half of global phase 2
+# not completed yet
+
+# PUBG JAPAN SERIES Season 2: Grade 2 - Phase 1
+# first half of global phase 1
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_2/Phase_1/Grade_2
+PJS21_1_parity <- tibble(points = c(105, 91, 89, 84, 
+                                     76, 69, 68, 68, 
+                                     67, 67, 62, 61, 
+                                     58, 44, 42, 40),
+                         phase = "PJSC1") # 12 matches
+global_parity <- bind_rows(global_parity, PJS21_1_parity)
+
+# PUBG JAPAN SERIES Season 2: Grade 2 - Phase 2
+# second half of global phase 1
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_2/Phase_2/Grade_2
+PJS21_2_parity <- tibble(points = c(138, 88, 83, 82, 
+                                     82, 80, 74, 67, 
+                                     64, 56, 52, 50, 
+                                     50, 49, 41, 30),
+                         phase = "PJSC2") # 12 matches
+global_parity <- bind_rows(global_parity, PJS21_2_parity)
+
+# PUBG JAPAN SERIES Season 3: Grade 2 - Phase 1
+# first half of global phase 2
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_3/Phase_1/Grade_2
+PJS22_1_parity <- tibble(points = c(122, 109, 91, 86, 
+                                     79, 74, 73, 61, 
+                                     61, 55, 52, 48, 
+                                     48, 43, 37, 36),
+                         phase = "PJSC3") # 12 matches
+global_parity <- bind_rows(global_parity, PJS22_1_parity)
+
+# PUBG JAPAN SERIES Season 3: Grade 2 - Phase 2
+# second half of global phase 2
+# https://liquipedia.net/pubg/PUBG_JAPAN_SERIES/Season_3/Phase_2/Grade_2
+# to be completed July 12
+
+# PUBG Champions League 2019
+# Chinese league - has a round robin format with 48 teams so can't be compared
+
+# PUBG Europe League - Phase 1
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_1
+PEL1_parity <- tibble(points = c(496, 417, 390, 383, 
+                                 382, 364, 362, 340, 
+                                 337, 324, 317, 316, 
+                                 315, 294, 196, 185),
+                      phase = "PEL1") # 60 matches
+global_parity <- bind_rows(global_parity, PEL1_parity)
+
+# PUBG Europe League - Phase 2
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2
+# to be completed July 7
+
+# PUBG Europe League Contenders - Phase 1
+# https://liquipedia.net/pubg/PUBG_Contenders_League/2019/Phase_1
+PELC1_parity <- tibble(points = c(250, 216, 155, 149, 
+                                  147, 146, 146, 140, 
+                                  139, 131, 101, 98, 
+                                  93, 91, 85, 73),
+                       phase = "PELC1") # 48 matches
+global_parity <- bind_rows(global_parity, PELC1_parity)
+
+# PUBG Europe League Contenders - Phase 2
+# https://liquipedia.net/pubg/PUBG_Contenders_League/2019/Phase_2
+# to be completed July 4
+
+# National PUBG League - Phase 1
+# https://liquipedia.net/pubg/National_PUBG_League/2019/Phase_1
+NPL1_parity <- tibble(points = c(368, 299, 290, 285,
+                                 283, 232, 226, 220,
+                                 216, 211, 211, 182,
+                                 176, 142, 140, 126),
+                      phase = "NPL1") # 40 matches
+global_parity <- bind_rows(global_parity, NPL1_parity)
+
+# National PUBG League - Phase 2
+# https://liquipedia.net/pubg/National_PUBG_League/2019/Phase_2
+NPL2_parity <- tibble(points = c(296, 285, 284, 274,
+                                 273, 244, 238, 237,
+                                 235, 224, 203, 194,
+                                 192, 154, 149, 139),
+                      phase = "NPL2") # 40 matches
+global_parity <- bind_rows(global_parity, NPL2_parity)
+
+# National PUBG League: Contenders - Phase 1
+# https://liquipedia.net/pubg/National_PUBG_League/2019/Contenders/Phase_1
+NPLC1_parity <- tibble(points = c(133, 133, 122, 108, 
+                                   106, 99, 96, 92, 
+                                   89, 87, 76, 74, 
+                                   67, 61, 48), # one team disqualified
+                 phase = "NPLC1") # 32 matches
+global_parity <- bind_rows(global_parity, NPLC1_parity)
+
+# National PUBG League: Contenders - Phase 2
+# https://liquipedia.net/pubg/National_PUBG_League/2019/Contenders/Phase_2
+NPLC2_parity <- tibble(points = c(200, 125, 106, 103, 
+                                    98, 96, 90, 83, 
+                                    82, 81, 80, 73, 
+                                    71, 53, 50, 42),
+                         phase = "NPLC2") # 32 matches
+global_parity <- bind_rows(global_parity, NPLC2_parity)
+
+# PUBG Europe League: Phase 2
+# https://liquipedia.net/pubg/PUBG_Europe_League/2019/Phase_2
+PEL2_parity <- tibble(points = c(705, 690, 686, 682,
+                                 568, 563, 531, 531,
+                                 518, 499, 498, 495,
+                                 478, 442, 429, 391),
+                         phase = "PEL2") # 96 matches
+global_parity <- bind_rows(global_parity, PEL2_parity)
+
+# PUBG Europe League: Contenders - Phase 2
+# https://liquipedia.net/pubg/PUBG_Contenders_League/2019/Phase_2
+PELC2_parity <- tibble(points = c(356, 341, 335, 321, 
+                                  305, 303, 302, 279, 
+                                  268, 262, 238, 230, 
+                                  219, 213, 207, 166),
+                         phase = "PELC2") # just finals, not group stage
+# unclear how many matches in finals
+global_parity <- bind_rows(global_parity, PELC2_parity)
+
+global_parity <- dplyr::mutate(global_parity, phase = factor(phase))
+
+```
+
+``` {r simpsons_index_viz, echo = FALSE, message = FALSE, results = "hide", fig.height = 6.5, fig.width = 8}
+
+# plot for all leagues
+
+# find inverse simpson's index for all teams
+# boostrap estimates of 95% confidence interval upper and lower bounds for each index
+# create dataframe with these values
+compare_parity <- global_parity %>%
+  group_by(phase) %>%
+  summarise(invsimpson = diversity(points, index = "invsimpson"),
+            lower_ci = H_boot(points, index = "invsimpson", R = 2000, ci = 95)$CI[1],
+            upper_ci = H_boot(points, index = "invsimpson", R = 2000, ci = 95)$CI[2])
+
+# create inverse simpson's index and CI plot
+pp <- compare_parity %>%
+  mutate(phase = fct_reorder(phase, invsimpson, .desc = FALSE)) %>%
+  ggplot(aes(phase, invsimpson)) +
+      geom_segment(aes(x = phase, 
+                     y = lower_ci, 
+                     xend = phase, 
+                     yend = upper_ci,
+                     color = phase)) +
+      scale_color_viridis(discrete = TRUE,
+                          option = "viridis", 
+                          direction = 1, 
+                          guide = FALSE,
+                          begin = 0,
+                          end = 1) +
+      geom_point(color = "white", 
+                 shape = 16, 
+                 size = 4) +
+      geom_point(color = "black", 
+                 shape = 16, 
+                 size = 1.3) +
+      xlab("League and Phase") +
+      ylab("Parity (Effective Number of Teams)") +
+      theme_bw() +
+      theme(axis.title.y = element_text(margin = margin(r = 20)), 
+           axis.title.x = element_text(margin = margin(t = 10)),
+           axis.text.x = element_blank(),
+           axis.ticks.x = element_blank(), 
+           panel.grid.major = element_line(color = "white"),
+           text = element_text(family = "Helvetica Neue", size = 12))
+
+pp <- pp + geom_text(aes(x = phase, 
+                          y = lower_ci - 0.1,
+                          label = phase,
+                          family = "Helvetica"),
+                      size = 2.5)
+
+suppressWarnings(print(pp))
+
+```
+
+^*Figure 2: Parity in competitive PUBG. Inverse Simpson's indices, with confidence intervals, for each phase of every major international league with a 16-team lobby, showing the effective number of teams in each league. Numbers on the ends of league acronyms refer to the phase.*^
+
+&#x200B;
+
+**PEL Phase 2 had the highest parity of all major international PUBG leagues**, followed by PEL Contenders Phase 2, with a very dramatic jump in PEL-C parity from Phase 1.
+
+This isn't necessarily what I expected to see based on the addition of two different teams to PEL Phase 2, but it's clear from the first plot that within the two clusters in the standings, teams are fairly close to each other on the whole.
+
+**This might have interesting implications for the number of matches in future phases.** With the top four teams sitting comfortably at the top of the standings since basically the end of Week 2, was it really necessary to play 72 more matches to see which of those four teams, with near-equal points totals throughout, would happen to put together more good games in a row near the end?
+
+On the other hand, without playing all 96 matches, Pittsburgh Knights wouldn't have had the opportunity to take over the 5^th^ place spot in the final weekend in such dramatic style. We'll see what Phase 3 looks like, I guess!
+
+As always, my .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-07-10-pel-phase-2-overview.Rmd), for those of you who are interested.
+
+&#x200B;
+
+**tl;dr Interactive tool to see how teams performed in PEL Phase 2. The top four teams (FaZe Clan, Natus Vincere, Team Liquid, and G2) separated out from the pack early on. A slow decline by Team SoloMid let the race for 5^th^ place be decided in just the final weekend with a great performance by Pittsburgh Knights. Also, PEL Phase 2 and PEL Contenders Phase 2 had the highest parity of all leagues so far.**
