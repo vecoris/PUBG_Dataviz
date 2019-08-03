@@ -55,7 +55,7 @@ summary(lm(luck$total_points ~ luck$X34569_favor_proportion)) # yes (explains 9.
 
 Short post today. I collected a ton of data from the GLL Grand Slam and nothing I tried to do with it worked out, so I'm falling back on the same old, which is still interesting. (I hope!)
 
-**Here’s how each team performed in Stockhlom based on the number of circles they were in.**
+**Here’s how each team performed in Stockholm based on the number of circles they were in.**
 
 &#x200B;
 
