@@ -242,7 +242,7 @@ SSG and Rumblers fell off considerably as the tournament went on, while Singular
 
 C9 also put in a strong comeback effort but couldn't quite get to their usual performance. I'm not convinced that they fell off their game just because they didn't have those central loot locations. The level of circle favor they had at this tournament was actually *higher* than what they [had overall in the NPL](https://pubgdataviz.netlify.com/post/phase2_week5_luck_plots/). Maybe it had to do with being forced to use less-practiced rotations?
 
-North American teams overall did a bit worse than at the previous major – I'm curious if this might be because of the long gap in competition following the end of the NPL. I might take a look later on at average tournament rank compared to time since last competitive match, maybe at the end of Phase 3, when there's more data on this with the new ruleset.
+North American teams overall did a bit worse than at the previous classic – I'm curious if this might be because of the long gap in competition following the end of the NPL. I might take a look later on at average tournament rank compared to time since last competitive match, maybe at the end of Phase 3, when there's more data on this with the new ruleset.
 
 &#x200B;
 
