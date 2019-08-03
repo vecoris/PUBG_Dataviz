@@ -1,0 +1,253 @@
+---
+title: "The GLL Grand Slam"
+author: "u/firstoverall"
+date: 2019-08-02
+categories: ["GLL", "PUBG"]
+tags: ["GLL", "Major", "PUBG", "Phase 2"]
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(collapse = TRUE)
+library(here)
+library(knitr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(ggthemes)
+library(viridis)
+library(magrittr)
+library(tibble)
+library(plotly)
+library(transformr)
+library(units)
+
+Sys.setenv("plotly_username" = "descent")
+Sys.setenv("plotly_api_key" = "KOJaKam6unaHMsBRocxh")
+Sys.setenv(TZ = "MST")
+
+# below you will find the gory R code of a biologist; proceed with caution
+
+```
+
+```{r gll_luck, include = FALSE}
+
+# read in the dataframe
+# read in the .csv
+
+luckloc <- here("static", "GLL_Luck.csv") 
+luck <- read.csv(luckloc)
+
+# quick plot overview of the circle favor vs points data
+plot(luck$X34569_favor_proportion, luck$total_points)
+abline(lm(luck$total_points ~ luck$X34569_favor_proportion))
+
+# is favor in these circles correlated to success
+cor.test(luck$X34569_favor_proportion, luck$total_points) # yes, 0.32
+
+# does the circle still have an effect? 
+summary(lm(luck$total_points ~ luck$X34569_favor_proportion)) # yes (explains 9.9% of variance, significant to p < 1x10^-17)
+
+```
+
+&#x200B;
+
+Short post today. I collected a ton of data from the GLL Grand Slam and nothing I tried to do with it worked out, so I'm falling back on the same old, which is still interesting. (I hope!)
+
+**Here’s how each team performed in Stockhlom based on the number of circles they were in.**
+
+&#x200B;
+
+**GLL "LUCK" PLOT**
+
+&#x200B;
+
+``` {r sig_luck_plot, echo = FALSE, message = FALSE, results = 'hide', fig.keep = 'all', fig.height = 7, fig.width = 7.5}
+
+# issue with matching up stems from mean of points per match not removing the same NA as circle favor proportion
+# solution is to take mean of points per match from the subset with no NA in cfp
+no_cfp_na_luck <- filter(luck, !is.na(X34569_favor_proportion))
+str(no_cfp_na_luck)
+# checking that this yields the correct number of values
+v1 <-  luck$X34569_favor_proportion
+length(v1[!is.na(v1)])
+
+# find the average of all match results for each team by grouping with dplyr
+summary_luck <- group_by(luck, team)
+summary_luck <- summarise(summary_luck, 
+                       mean_X34569_favor = mean(X34569_favor_proportion,
+                                                 na.rm = TRUE),
+                       mean_placement_points = mean(placement_points),
+                       mean_kill_points = mean(kill_points),
+                       mean_points = mean(total_points),
+                       mean_wins = mean(wins))
+str(summary_luck)
+
+# to create trend traces, create a subset with only data from day 1
+luck_day1 <- filter(luck, day == 1)
+str(luck_day1)
+summary_luck_day1 <- group_by(luck_day1, team)
+summary_luck_day1 %<>% summarise(
+  mean_X34569_favor = mean(X34569_favor_proportion,
+                           na.rm = TRUE),
+  mean_placement_points = mean(placement_points),
+  mean_kill_points = mean(kill_points),
+  mean_points = mean(total_points),
+  mean_wins = mean(wins))
+str(summary_luck_day1)
+
+# days 1 and 2 only
+luck_day2 <- filter(luck, day != 3)
+str(luck_day2)
+summary_luck_day2 <- group_by(luck_day2, team)
+summary_luck_day2 %<>% summarise(
+  mean_X34569_favor = mean(X34569_favor_proportion,
+                           na.rm = TRUE),
+  mean_placement_points = mean(placement_points),
+  mean_kill_points = mean(kill_points),
+  mean_points = mean(total_points),
+  mean_wins = mean(wins))
+str(summary_luck_day2)
+
+# create custom vector of team colors
+team_colors <- c("gold4","turquoise4","deepskyblue","red4",
+                 "mediumpurple3","gray35","maroon3","orangered2",
+                 "goldenrod1","chocolate2","lightpink3","olivedrab3",
+                 "springgreen4","gray55","darkslateblue","turquoise2")
+
+# create base plot of match points vs circle favor, constraining axes to centre the data
+# expanding plot area to extrapolate linear model
+p <- ggplot(summary_luck, aes(x = mean_X34569_favor, 
+                                y = mean_points)) +
+  xlab("Proportion of Favorable Circles") +
+  ylab("Points per Match") +
+  scale_y_continuous(limit = c(0, 20),
+                    expand = c(0, 0)) +
+  scale_x_continuous(limit = c(0, 1),
+                    expand = c(0, 0)) +
+  coord_cartesian(xlim = c(0.17,
+                           (2 * mean(luck$X34569_favor_proportion,
+                                            na.rm = TRUE)) - 0.17),
+                  ylim = c(1.6,
+                           (2 * mean(luck$total_points)) - 1.6)) +
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# add vertical line with mean circle favor
+p <- p + geom_vline(xintercept = mean(luck$X34569_favor_proportion, 
+                                na.rm = TRUE),
+              size = 0.3,
+              color = "gray80")
+
+# add horizontal line with mean match points
+p <- p + geom_hline(yintercept = mean(luck$total_points),
+              size = 0.3,
+              color = "gray80")
+
+# add linear model of relationship between match points and circle favor
+p <- p + stat_smooth(method = "lm", fullrange = TRUE,
+               col = "black", fill = NA,
+               size = 0.3, na.rm = TRUE)
+
+# add 1/2 standard deviation guides
+# first, find the intercept of the linear model to create 1/2 standard deviation guides
+luck_model <- lm(no_cfp_na_luck$total_points ~ no_cfp_na_luck$X34569_favor_proportion)
+luck_intercept <- coef(luck_model)[1]
+
+# create intercepts and slopes for 1/2 standard deviation guides
+upper_sd_intercept <- luck_intercept + sd(no_cfp_na_luck$total_points)/2 - 0.16589
+lower_sd_intercept <- luck_intercept - sd(no_cfp_na_luck$total_points)/2 - 0.16589
+sd_slope <- coef(luck_model)[2]
+
+# add standard deviation guides to the plot
+p <- p + geom_abline(intercept = upper_sd_intercept, 
+                     slope = sd_slope, 
+                     col = "gray80", 
+                     size = 0.3) +
+  geom_abline(intercept = lower_sd_intercept, 
+                     slope = sd_slope, 
+                     col = "gray80", 
+                     size = 0.3)
+
+# add team acronyms to the plot
+p <-  p + geom_text_repel(aes(x = mean_X34569_favor,
+                 y = mean_points,
+                 label = team,
+                 family = "Helvetica",
+                 fontface = "bold"),
+             color = team_colors,
+             size = 4.3,
+             force = 0.001)
+
+# add trend traces from day 1 to day 2
+p <- p + geom_curve(aes(x = summary_luck_day1$mean_X34569_favor,
+                        y = summary_luck_day1$mean_points,
+                        xend = summary_luck_day2$mean_X34569_favor,
+                        yend = summary_luck_day2$mean_points),
+                    curvature = 0.1, 
+                    alpha = 0.5,
+                    col = team_colors, 
+                    lty = "dotted")
+
+# add trend traces from day 2 to day 3
+p <- p + geom_curve(aes(x = summary_luck_day2$mean_X34569_favor,
+                        y = summary_luck_day2$mean_points,
+                        xend = summary_luck$mean_X34569_favor,
+                        yend = summary_luck$mean_points),
+                    curvature = 0.1,
+                    alpha = 0.85,
+                    col = team_colors, 
+                    lty = "dotted")
+
+# set placement of corner labels
+annotations <- data.frame(
+        xpos = c(-Inf, -Inf, Inf, Inf), # left, left, right, right
+        ypos = c(Inf, -Inf, Inf, -Inf), # up, down, up, down
+        annotateText = c("DEFYING FATE",
+                         "CAN'T BLAME EM",
+                         "#BLESSED",
+                         "YIKES ZONE"),
+        # order: upper left, lower left, upper right, lower right
+        hjustvar <- c(-0.25, -0.25, 1.3, 1.25), 
+        vjustvar <- c(3.25, -2, 3.25, -2))
+        
+# add corner labels to the plot
+p <- p + geom_text(data = annotations,
+              aes(x = xpos, y = ypos,
+                  label = annotateText,
+                  family = "Helvetica"),
+              color = "gray80",
+              size = 3.5,
+              hjust = hjustvar,
+              vjust = vjustvar)
+
+suppressWarnings(print(p))
+
+```
+
+^*Figure 1: Total points per match for each GLL team based on circle favor. Teams that are above the black line performed better than expected, and teams below the line, worse. The gray lines represent one half standard deviation from the mean in points per match. The dotted trace represents the change in performance from Day 1 to Day 2 to Day 3.*^
+
+&#x200B;
+
+**FaZe and Athletico outperformed their circle favor by the highest margin of all teams.** NaVi was right up there with them, and had the third- or fourth-worst circle luck throughout the tournament.
+
+Liquid, with wildly high circle favor, was on par with other top teams – as usual, this analysis ignores circles 1 and 2, as being in or out of them doesn't contribute significantly to the end results, so this circle favor didn't just come from where they loot.
+
+SSG and Rumblers fell off considerably as the tournament went on, while Singularity, Incognito, and Pittsburgh Knights recovered over time.
+
+C9 also put in a strong comeback effort but couldn't quite get to their usual performance. I'm not convinced that they fell off their game just because they didn't have those central loot locations. The level of circle favor they had at this tournament was actually *higher* than what they [had overall in the NPL](https://pubgdataviz.netlify.com/post/phase2_week5_luck_plots/). Maybe it had to do with being forced to use less-practiced rotations?
+
+North American teams overall did a bit worse than at the previous major – I'm curious if this might be because of the long gap in competition following the end of the NPL. I might take a look later on at average tournament rank compared to time since last competitive match, maybe at the end of Phase 3, when there's more data on this with the new ruleset.
+
+&#x200B;
+
+As always, my .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-08-02-GLL.Rmd), for those of you who are interested.
+
+&#x200B;
+
+**tl;dr Circle luck at the GLL Grand Slam. FaZe, Athletico, and NaVi outperformed their circle favor by the highest margin.**
