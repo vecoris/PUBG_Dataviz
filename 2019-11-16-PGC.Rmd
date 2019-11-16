@@ -1,0 +1,1018 @@
+---
+title: "PUBG Global Championship – New Circle Impact Plots"
+author: "u/firstoverall"
+date: 2019-11-16
+categories: ["PUBG"]
+tags: ["PUBG"]
+---
+
+```{r setup, include = FALSE}
+
+knitr::opts_chunk$set(collapse = TRUE)
+library(here)
+library(knitr)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(ggthemes)
+library(viridis)
+library(magrittr)
+library(httr)
+library(jsonlite)
+library(tibble)
+library(lubridate)
+library(png)
+library(ggmap)
+library(magick)
+library(tictoc)
+library(pryr)
+
+# set local time zone
+Sys.setenv(TZ = "MST")
+
+# below you will find the gory R code of a biologist; proceed with caution
+
+```
+
+``` {r API_tournament_data, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# create a database of all json files for all PGC matches
+# na-pgcgr1, na-pgcgr2, na-pgcgr3
+
+# first, request all matches in all tournaments to create a dataframe where each entry is one match
+
+# request tournament IDs for all PGC Group 1 matches
+key = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJlNWUwMDVkMC02NmQxLTAxMzctNmNmMS0wZGRhNTBiY2U5NzUiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTU5NDE3NTQwLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6ImJhaWx5LW1jY3VsbG9jIn0.i1ENgWDASpUk2eLaJYs9b6QsWpmAz7Hg6hqob9113Uw"
+testurl  <- "https://api.pubg.com/tournaments/na-pgcgr1"
+match_dataGR1 <- GET(url = testurl, accept("application/vnd.api+json"),
+                     add_headers(Authorization = key))
+match_dataGR1$status_code # 200 yay
+
+# request tournament IDs for all PGC Group 2 matches
+testurl  <- "https://api.pubg.com/tournaments/na-pgcgr2"
+match_dataGR2 <- GET(url = testurl, accept("application/vnd.api+json"), 
+                     add_headers(Authorization = key))
+match_dataGR2$status_code # 200 yay
+
+# request tournament IDs for all PGC Group 3 matches
+testurl  <- "https://api.pubg.com/tournaments/na-pgcgr3"
+match_dataGR3 <- GET(url = testurl, accept("application/vnd.api+json"), 
+                     add_headers(Authorization = key))
+match_dataGR3$status_code # 200 yay
+
+```
+
+``` {r make_dataframe, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# convert GR1 match ID data to a usable dataframe
+match_dataGR1 <- rawToChar(match_dataGR1$content)
+match_dataGR1 <- fromJSON(match_dataGR1)
+
+matches1 <- tibble(match_id = match_dataGR1$included$id,
+                   date_time = as_datetime(match_dataGR1$included$attributes$createdAt))
+
+# convert GR2 match ID data
+match_dataGR2 <- rawToChar(match_dataGR2$content)
+match_dataGR2 <- fromJSON(match_dataGR2)
+matches2 <- tibble(match_id = match_dataGR2$included$id,
+                   date_time = as_datetime(match_dataGR2$included$attributes$createdAt))
+
+matches <- bind_rows(matches1, matches2)
+
+# convert GR3 match ID data
+match_dataGR3 <- rawToChar(match_dataGR3$content)
+match_dataGR3 <- fromJSON(match_dataGR3)
+matches3 <- tibble(match_id = match_dataGR3$included$id,
+                   date_time = as_datetime(match_dataGR3$included$attributes$createdAt))
+
+matches <- bind_rows(matches, matches3)
+
+```
+
+``` {r extract_telemetry_data, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# for each match, extract the telemetry json file
+
+matches %<>% mutate(match_id_url = str_c("https://api.pubg.com/shards/tournament/matches/", match_id))
+matches # yay ok now match id is in this overall dataframe for all matches!
+
+# extract telemetry file from match info
+# telemetry url can be found at match$included$attributes$URL
+# test:
+match_id_url <- matches$match_id_url[1]
+match_id_url
+match_data_test <- GET(url = match_id_url, accept("application/vnd.api+json"), 
+                       add_headers(Authorization = key))
+match_data_test <- rawToChar(match_data_test$content)
+match_data_test <- fromJSON(match_data_test)
+telemetry_url <- discard(match_data_test$included$attributes$URL, is.na)
+telemetry_url # got it!
+
+# custom function to iterate over all matches to pull the telemetry url for each match
+x <<- 1 
+pull_telemetry <- function(match_id_url) {
+  key = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJlNWUwMDVkMC02NmQxLTAxMzctNmNmMS0wZGRhNTBiY2U5NzUiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNTU5NDE3NTQwLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6ImJhaWx5LW1jY3VsbG9jIn0.i1ENgWDASpUk2eLaJYs9b6QsWpmAz7Hg6hqob9113Uw"
+  match_data <- GET(url = match_id_url, accept("application/vnd.api+json"), 
+                    add_headers(Authorization = key))
+  match_data <- rawToChar(match_data$content)
+  match_data <- fromJSON(match_data)
+  telemetry_url <- discard(match_data$included$attributes$URL, is.na)
+  print(telemetry_url)
+  print(x)
+  x <<- x + 1
+  return(telemetry_url)
+}
+
+pull_telemetry(match_id_url) # works perfectly!
+
+# this function seemingly can't handle vector input so i have to use lapply instead of dplyr::mutate
+telemetry_urls <- lapply(X = matches$match_id_url, FUN = pull_telemetry)
+telemetry_urls <- as.vector(unlist(telemetry_urls))
+class(telemetry_urls)
+telemetry_urls
+
+# add this vector of json file urls to main dataframe
+matches %<>% mutate(telemetry_url = telemetry_urls)
+matches
+
+# download all the json files and turn them each into a dataframe. create a dataframe of dataframes.
+
+# time it out
+
+# tic("same variable name")
+# testurl <- telemetry_urls[3]
+# match_data <- GET(url = testurl)
+# match_data_char <- rawToChar(match_data$content)
+# match_data_dataframe <- fromJSON(match_data_char)
+# head(match_data_dataframe)
+# toc() # same variable name: 8.678 sec elapsed
+# 
+# tic("different variable names")
+# testurl <- telemetry_urls[3]
+# match_data <- GET(url = testurl)
+# match_data <- rawToChar(match_data$content)
+# match_data <- fromJSON(match_data)
+# head(match_data)
+# toc() # different variable names: 8.239 sec elapsed
+
+# ok i know that my custom functions from last time took around 9 seconds to run each. 
+# if downloading the data was taking 7 of those seconds, locally storing all the data and being able to load it in a csv 
+# instead of redownloading it for every line/every match will save me a lot of time.
+
+x <<- 1
+pull_telemetry_file <- function(telemetry_url) {
+  match_data <- GET(url = telemetry_url)
+  match_data_char <- rawToChar(match_data$content)
+  match_data_dataframe <- fromJSON(match_data_char)
+  print(x)
+  x <<- x + 1
+  return(match_data_dataframe)
+}
+
+# test
+test_dataframe1 <- pull_telemetry_file(matches$telemetry_url[1])
+head(test_dataframe1) # match.bro.custom.es_na-pgcgr1_01.bro.normal.as.2019.11.08.17.3081f5b7-8665-4946-bb19-50fc3b2d5bd4
+test_dataframe2 <- pull_telemetry_file(matches$telemetry_url[2])
+head(test_dataframe2) # match.bro.custom.es_na-pgcgr1_01.bro.normal.as.2019.11.08.16.a29931e8-a702-4a43-8916-0fa2330921d1
+# nice!
+
+test_list <- list(test_dataframe1, test_dataframe2)
+test_vector <- as.vector(test_list)
+class(test_vector)
+
+# test_matches_dataframe <- mutate(matches, telemetry_data = pull_telemetry_file(telemetry_url)) # still doesn't work
+
+x <<- 1 
+# create list of dataframe of telemetry files for all of the matches!!
+telemetry_file <- lapply(X = matches$telemetry_url, FUN = pull_telemetry_file)
+# this creates a list where every element is a dataframe
+# a tibble should be able to add a column that is a list?
+
+matches <- matches %>% mutate(telemetry_data = telemetry_file)
+head(matches) # thank goodness all the files look different
+head(matches$telemetry_data[[1]]) # ok this [[]] is how to access each dataframe
+class(matches$telemetry_data) # list
+class(matches$telemetry_data[[2]]) # dataframe
+
+```
+
+``` {r extract_circle_data, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# get x coordinates of circles 1-9 for each match
+
+x <<- 1
+pull_circle_centers_x <- function(telemetry_data) {
+  match_data <- telemetry_data
+  #### get circle 1 x coordinate
+  circle_center_1_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 1.0)])[1] # returns the first white circle x coordinate where the game state is phase 1!!!!!
+  ### get circle 2 x coordinate
+  circle_center_2_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 2.0)])[1]
+  ### get circle 3 x coordinate
+  circle_center_3_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 3.0)])[1]
+  ### get circle 4 x coordinate
+  circle_center_4_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 4.0)])[1]
+  ### get circle 5 x coordinate
+  circle_center_5_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 5.0)])[1]
+  ### get circle 6 x coordinate
+  circle_center_6_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 6.0)])[1]
+  ### get circle 7 x coordinate
+  circle_center_7_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 7.0)])[1]
+  ### get circle 8 x coordinate
+  circle_center_8_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 8.0)])[1]
+  ### get circle 9 x coordinate
+  circle_center_9_x <- na.omit(match_data$gameState$poisonGasWarningPosition$x[which(match_data$common$isGame == 9.0)])[1]
+  circle_centers <- tibble(circle_center_1_x = circle_center_1_x,
+                           circle_center_2_x = circle_center_2_x,
+                           circle_center_3_x = circle_center_3_x,
+                           circle_center_4_x = circle_center_4_x,
+                           circle_center_5_x = circle_center_5_x,
+                           circle_center_6_x = circle_center_6_x,
+                           circle_center_7_x = circle_center_7_x,
+                           circle_center_8_x = circle_center_8_x,
+                           circle_center_9_x = circle_center_9_x)
+  print(x)
+  x <<- x + 1
+  return(circle_centers)
+}
+
+pull_circle_centers_x(matches$telemetry_data[[1]]) # works!
+
+# run for all PGC matches
+circle_centers_x <- lapply(X = matches$telemetry_data, FUN = pull_circle_centers_x)
+circle_centers_x
+circle_centers_x <- bind_rows(circle_centers_x) # nice, this understands that i want it to bind each list element and knows they're tibbles!
+circle_centers_x
+# add x coordinates to dataframe of PGC data
+matches <- bind_cols(matches, circle_centers_x)
+matches
+
+# repeat for y circle center coordinates
+
+x <<- 1
+pull_circle_centers_y <- function(telemetry_data) {
+  match_data <- telemetry_data
+  #### get circle 1 y coordinate
+  circle_center_1_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 1.0)])[1] # returns the first white circle y coordinate where the game state is phase 1!!!!!
+  ### get circle 2 y coordinate
+  circle_center_2_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 2.0)])[1]
+  ### get circle 3 y coordinate
+  circle_center_3_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 3.0)])[1]
+  ### get circle 4 y coordinate
+  circle_center_4_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 4.0)])[1]
+  ### get circle 5 y coordinate
+  circle_center_5_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 5.0)])[1]
+  ### get circle 6 y coordinate
+  circle_center_6_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 6.0)])[1]
+  ### get circle 7 y coordinate
+  circle_center_7_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 7.0)])[1]
+  ### get circle 8 y coordinate
+  circle_center_8_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 8.0)])[1]
+  ### get circle 9 y coordinate
+  circle_center_9_y <- na.omit(match_data$gameState$poisonGasWarningPosition$y[which(match_data$common$isGame == 9.0)])[1]
+  circle_centers <- tibble(circle_center_1_y = circle_center_1_y,
+                           circle_center_2_y = circle_center_2_y,
+                           circle_center_3_y = circle_center_3_y,
+                           circle_center_4_y = circle_center_4_y,
+                           circle_center_5_y = circle_center_5_y,
+                           circle_center_6_y = circle_center_6_y,
+                           circle_center_7_y = circle_center_7_y,
+                           circle_center_8_y = circle_center_8_y,
+                           circle_center_9_y = circle_center_9_y)
+  print(x)
+  x <<- x + 1
+  return(circle_centers)
+}
+
+pull_circle_centers_y(matches$telemetry_data[[1]]) # YESSS
+
+# run for all PGC matches
+circle_centers_y <- lapply(X = matches$telemetry_data, FUN = pull_circle_centers_y)
+circle_centers_y
+circle_centers_y <- bind_rows(circle_centers_y)
+circle_centers_y
+# add y coordinates to dataframe of PGC data
+matches <- bind_cols(matches, circle_centers_y)
+matches
+
+# i'm going to want the distance to center as a proportion of the circle radius so i can fairly compare btwn diff size circles and diff size maps
+# function to pull the radius of the circle
+
+x <<- 1
+pull_circle_radii <- function(telemetry_data) {
+  match_data <- telemetry_data
+  #### get circle 1 radius
+  circle_radius_1 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 1.0)])[1]
+  ### get circle 2 radius
+  circle_radius_2 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 2.0)])[1]
+  ### get circle 3 radius
+  circle_radius_3 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 3.0)])[1]
+  ### get circle 4 radius
+  circle_radius_4 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 4.0)])[1]
+  ### get circle 5 radius
+  circle_radius_5 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 5.0)])[1]
+  ### get circle 6 radius
+  circle_radius_6 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 6.0)])[1]
+  ### get circle 7 radius
+  circle_radius_7 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 7.0)])[1]
+  ### get circle 8 radius
+  circle_radius_8 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 8.0)])[1]
+  ### get circle 9 radius
+  circle_radius_9 <- na.omit(match_data$gameState$poisonGasWarningRadius[which(match_data$common$isGame == 9.0)])[1]
+  circle_radii <- tibble(circle_radius_1 = circle_radius_1,
+                         circle_radius_2 = circle_radius_2,
+                         circle_radius_3 = circle_radius_3,
+                         circle_radius_4 = circle_radius_4,
+                         circle_radius_5 = circle_radius_5,
+                         circle_radius_6 = circle_radius_6,
+                         circle_radius_7 = circle_radius_7,
+                         circle_radius_8 = circle_radius_8,
+                         circle_radius_9 = circle_radius_9)
+  print(x)
+  x <<- x + 1
+  return(circle_radii)
+}
+
+# test
+pull_circle_radii(matches$telemetry_data[[1]]) # nice
+
+# run for all PGC matches
+circle_radii <- lapply(X = matches$telemetry_data, FUN = pull_circle_radii)
+circle_radii
+circle_radii <- bind_rows(circle_radii)
+circle_radii
+# add radii to dataframe of PGC data
+PGC_matches <- bind_cols(matches, circle_radii)
+PGC_matches
+
+```
+
+``` {r extract_player_data, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# for each match i want:
+# the coordinates of all players based on team id at circles 1-9
+# the team id associated with each player
+
+x <<- 1
+pull_player_x <- function(telemetry_data) {
+  match_data <- telemetry_data
+  names <- na.omit(unique(match_data$character$name))
+  locs_list <- list()
+  for (i in names) {
+    #### get circle 1 x coordinate
+    loc_1_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 1.0 & match_data$character$name == i)])[1]
+    ### get circle 2 x coordinate
+    loc_2_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 2.0 & match_data$character$name == i)])[1]
+    ### get circle 3 x coordinate
+    loc_3_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 3.0 & match_data$character$name == i)])[1]
+    ### get circle 4 x coordinate
+    loc_4_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 4.0 & match_data$character$name == i)])[1]
+    ### get circle 5 x coordinate
+    loc_5_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 5.0 & match_data$character$name == i)])[1]
+    ### get circle 6 x coordinate
+    loc_6_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 6.0 & match_data$character$name == i)])[1]
+    ### get circle 7 x coordinate
+    loc_7_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 7.0 & match_data$character$name == i)])[1]
+    ### get circle 8 x coordinate
+    loc_8_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 8.0 & match_data$character$name == i)])[1]
+    ### get circle 9 x coordinate
+    loc_9_x <- na.omit(match_data$character$location$x[which(match_data$common$isGame == 9.0 & match_data$character$name == i)])[1]
+    ### create key to join this dataframe to PGC_matches dataframe down the line
+    # join them on match ID
+    match_id_long <- match_data$MatchId[1]
+    match_id <- str_sub(match_id_long, -36, -1)
+    # find team name
+    underscore_index <- str_locate(i, "_")[1] - 1
+    team_name <- str_sub(i, 1, underscore_index)
+    # create tibble of x location data
+    locs_x_temp <- tibble(match_id = match_id,
+                          player_name = i,
+                          team_name = team_name,
+                          loc_1_x = loc_1_x,
+                          loc_2_x = loc_2_x,
+                          loc_3_x = loc_3_x,
+                          loc_4_x = loc_4_x,
+                          loc_5_x = loc_5_x,
+                          loc_6_x = loc_6_x,
+                          loc_7_x = loc_7_x,
+                          loc_8_x = loc_8_x,
+                          loc_9_x = loc_9_x)
+    locs_list[[i]] <- locs_x_temp # add it to your list
+  }
+  # combine all the temporary tibbles from the for loop into one long dataframe
+  locs_x <- bind_rows(locs_list)
+  print(x)
+  x <<- x + 1
+  return(locs_x)
+}
+
+pull_player_x(PGC_matches$telemetry_data[[1]]) # yay!!! # lots of NA bc presumably these players die
+
+# get data for every player for every match - lapply not working for some reason
+telemetry_list <- PGC_matches$telemetry_data
+class(telemetry_list)
+locs_x <- tibble()
+for (i in telemetry_list) {
+  locs_data <- pull_player_x(i)
+  locs_x <- bind_rows(locs_x, locs_data)
+}
+locs_x # has 64 * 17 rows!
+print(locs_x, n = 100) # great shows 1st and 2nd matches!!
+
+# add x coordinates to dataframe of PGC data
+PGC_matches_locs <- suppressMessages(left_join(PGC_matches, locs_x))
+PGC_matches_locs <- select(PGC_matches_locs, -c(telemetry_data))
+PGC_matches_locs
+
+# repeat for y coordinates
+
+x <<- 1
+pull_player_y <- function(telemetry_data) {
+  match_data <- telemetry_data
+  names <- na.omit(unique(match_data$character$name))
+  locs_list <- list()
+  for (i in names) {
+    #### get circle 1 y coordinate
+    loc_1_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 1.0 & match_data$character$name == i)])[1]
+    ### get circle 2 y coordinate
+    loc_2_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 2.0 & match_data$character$name == i)])[1]
+    ### get circle 3 y coordinate
+    loc_3_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 3.0 & match_data$character$name == i)])[1]
+    ### get circle 4 y coordinate
+    loc_4_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 4.0 & match_data$character$name == i)])[1]
+    ### get circle 5 y coordinate
+    loc_5_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 5.0 & match_data$character$name == i)])[1]
+    ### get circle 6 y coordinate
+    loc_6_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 6.0 & match_data$character$name == i)])[1]
+    ### get circle 7 y coordinate
+    loc_7_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 7.0 & match_data$character$name == i)])[1]
+    ### get circle 8 y coordinate
+    loc_8_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 8.0 & match_data$character$name == i)])[1]
+    ### get circle 9 y coordinate
+    loc_9_y <- na.omit(match_data$character$location$y[which(match_data$common$isGame == 9.0 & match_data$character$name == i)])[1]
+    ### create key to join this dataframe to PGC_matches dataframe down the line
+    # join them on match ID
+    match_id_long <- match_data$MatchId[1]
+    match_id <- str_sub(match_id_long, -36, -1)
+    # find team name
+    underscore_index <- str_locate(i, "_")[1] - 1
+    team_name <- str_sub(i, 1, underscore_index)
+    # create tibble of y location data
+    locs_y_temp <- tibble(match_id = match_id,
+                          player_name = i,
+                          team_name = team_name,
+                          loc_1_y = loc_1_y,
+                          loc_2_y = loc_2_y,
+                          loc_3_y = loc_3_y,
+                          loc_4_y = loc_4_y,
+                          loc_5_y = loc_5_y,
+                          loc_6_y = loc_6_y,
+                          loc_7_y = loc_7_y,
+                          loc_8_y = loc_8_y,
+                          loc_9_y = loc_9_y)
+    locs_list[[i]] <- locs_y_temp # add it to your list
+  }
+  # combine all the temporary tibbles from the for loop into one long dataframe
+  locs_y <- bind_rows(locs_list)
+  print(x)
+  x <<- x + 1
+  return(locs_y)
+}
+
+pull_player_y(PGC_matches$telemetry_data[[1]]) # yay!!! # lots of NA bc presumably these players die
+
+# get data for every player for every match - lapply not working for some reason
+telemetry_list <- PGC_matches$telemetry_data
+class(telemetry_list)
+locs_y <- tibble()
+for (i in telemetry_list) {
+  locs_data <- pull_player_y(i)
+  locs_y <- bind_rows(locs_y, locs_data)
+}
+locs_y # has 64 * 17 rows!
+print(locs_y, n = 100) # great shows 1st and 2nd matches!!
+
+# add y coordinates to dataframe of PGC data
+PGC_matches_locs <- suppressMessages(left_join(PGC_matches_locs, locs_y))
+PGC_matches_locs
+
+# calculate distance to centre coordinates with pythagorean theorem and scale by radius
+# average distance for each team
+# build visualization
+
+
+```
+
+``` {r tidy_player_data, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# calculate distance to centre coordinates for each player for each match with pythagorean theorem and scale by radius
+# average distance to centre for each circle for each team for each match
+# build visualization comparing avg distance to centre at each circle to team performance in match (points) - will need data on points!
+
+# a^2 + b^2 = c^2
+# distance to centre = sqrt((x1-x2)^2 + (y1-y2)^2)
+# test this by comparing calculated distance to map in match!
+x1 <- PGC_matches_locs$circle_center_4_x[321]
+x2 <- PGC_matches_locs$loc_4_x[321]
+y1 <- PGC_matches_locs$circle_center_4_y[321]
+y2 <- PGC_matches_locs$loc_4_y[321]
+test_dist <- sqrt((x1 - x2)^2 + (y1 - y2)^2)
+test_dist #  65002.65 # whole thing is 816000, so this will be about 8% of the map width 
+PGC_matches_locs$circle_radius_4[321] # and the radius is 45913.73 so just smaller by 19088 cm so 191 m??? he's about 200 m outside the circle
+PGC_matches_locs$player_name[321] # "4AM_We1less"
+PGC_matches_locs$match_id[321] # "f5b1d59c-a78a-4ce5-86f3-ae4a9b3f9e9a" first match on day 2
+# looks right to me!!!
+
+PGC_matches_locs %<>% mutate(distance_1 = sqrt((circle_center_1_x - loc_1_x)^2 + (circle_center_1_y - loc_1_y)^2),
+                             distance_2 = sqrt((circle_center_2_x - loc_2_x)^2 + (circle_center_2_y - loc_2_y)^2),
+                             distance_3 = sqrt((circle_center_3_x - loc_3_x)^2 + (circle_center_3_y - loc_3_y)^2),
+                             distance_4 = sqrt((circle_center_4_x - loc_4_x)^2 + (circle_center_4_y - loc_4_y)^2),
+                             distance_5 = sqrt((circle_center_5_x - loc_5_x)^2 + (circle_center_5_y - loc_5_y)^2),
+                             distance_6 = sqrt((circle_center_6_x - loc_6_x)^2 + (circle_center_6_y - loc_6_y)^2),
+                             distance_7 = sqrt((circle_center_7_x - loc_7_x)^2 + (circle_center_7_y - loc_7_y)^2),
+                             distance_8 = sqrt((circle_center_8_x - loc_8_x)^2 + (circle_center_8_y - loc_8_y)^2),
+                             distance_9 = sqrt((circle_center_9_x - loc_9_x)^2 + (circle_center_9_y - loc_9_y)^2))
+select(PGC_matches_locs, c(distance_1, distance_2, distance_3, distance_4, distance_5, distance_6, distance_7, distance_8, distance_9)) # looks good!
+
+# now scale distance to centre as a proportion of the circle radius
+PGC_matches_locs$circle_radius_9[1] # maybe this will be a problem :/
+PGC_matches_locs %<>% mutate(scaled_distance_1 = distance_1/circle_radius_1,
+                             scaled_distance_2 = distance_2/circle_radius_2,
+                             scaled_distance_3 = distance_3/circle_radius_3,
+                             scaled_distance_4 = distance_4/circle_radius_4,
+                             scaled_distance_5 = distance_5/circle_radius_5,
+                             scaled_distance_6 = distance_6/circle_radius_6,
+                             scaled_distance_7 = distance_7/circle_radius_7,
+                             scaled_distance_8 = distance_8/circle_radius_8,
+                             scaled_distance_9 = distance_9/circle_radius_8)
+select(PGC_matches_locs, c(scaled_distance_1, scaled_distance_2, scaled_distance_3,
+                           scaled_distance_4, scaled_distance_5, scaled_distance_6,
+                           scaled_distance_7, scaled_distance_8, scaled_distance_9)) 
+# looks good!
+
+# average distance to centre for each circle for each team for each match
+
+PGC_summary <- PGC_matches_locs %>% 
+  group_by(match_id, team_name) %>%
+  summarize(team_avg_distance_1 = mean(scaled_distance_1, na.rm = T),
+            team_avg_distance_2 = mean(scaled_distance_2, na.rm = T),
+            team_avg_distance_3 = mean(scaled_distance_3, na.rm = T),
+            team_avg_distance_4 = mean(scaled_distance_4, na.rm = T),
+            team_avg_distance_5 = mean(scaled_distance_5, na.rm = T),
+            team_avg_distance_6 = mean(scaled_distance_6, na.rm = T),
+            team_avg_distance_7 = mean(scaled_distance_7, na.rm = T),
+            team_avg_distance_8 = mean(scaled_distance_8, na.rm = T),
+            team_avg_distance_9 = mean(scaled_distance_9, na.rm = T))
+PGC_summary
+
+match_number <- PGC_matches %>% select(c(match_id, date_time, circle_radius_1)) %>% 
+  add_column(match_number = c(6, 5, 3, 2, 1, 6, 5, 4, 3, 2, 1, 6, 5, 4, 3, 2, 1), 
+             # it's the sanhok game on day 1, match 4, that's missing
+             day = c(1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3))
+match_number
+match_number %<>% select(-c(date_time, circle_radius_1))
+
+PGC_summary <- suppressMessages(left_join(PGC_summary, match_number))
+PGC_summary
+
+unique(PGC_summary$team_name)
+unique(PGC_matches_locs$player_name)
+
+# for viz, i need team avg distance from each circle and points per match
+# see if it looks different with only the "important" circles 34569
+
+# add points per match
+
+points_loc <- here::here("static", "PGC_points.csv")
+points_wide <- suppressMessages(read_csv(points_loc))
+class(points_wide$p1) # ok the columns are numeric even though tibble calls them dbl...
+points_wide %<>%
+  mutate("1" = p1 + k1,
+         "2" = p2 + k2,
+         "3" = p3 + k3,
+         "4" = p4 + k4,
+         "5" = p5 + k5,
+         "6" = p6 + k6) %>%
+  select(-c(p1, k1, p2, k2, p3, k3, p4, k4, p5, k5, p6, k6))
+points_wide
+
+points <- points_wide %>% 
+  gather(match_number, points, "1":"6", factor_key = TRUE) %>% 
+  mutate(match_number = as.numeric(match_number))
+points
+
+# add points to summary
+PGC_summary <- suppressMessages(left_join(PGC_summary, points, by = c("match_number", "team_name", "day")))
+PGC_summary # yay it has 272 rows so 16 teams, 17 matches
+
+# remember to remove all day 1 match 4 info # this seems to have been accomplished by the join
+
+# oops this still isn't tidy!
+# i want one column for circle number
+PGC_summary_tidy <- PGC_summary %>% 
+  rename("1" = team_avg_distance_1,
+         "2" = team_avg_distance_2,
+         "3" = team_avg_distance_3,
+         "4" = team_avg_distance_4,
+         "5" = team_avg_distance_5,
+         "6" = team_avg_distance_6,
+         "7" = team_avg_distance_7,
+         "8" = team_avg_distance_8,
+         "9" = team_avg_distance_9) %>%
+  gather(circle_number, distance, "1":"9", factor_key = TRUE) %>% 
+  mutate(circle_number = as.numeric(circle_number))
+PGC_summary_tidy
+
+# average distance to all circles
+PGC_summary_tidy %<>% group_by(team_name, match_number, day) %>%
+  mutate(mean_distance = mean(distance, na.rm = T)) %>%
+  ungroup()
+
+# average distance only to 34569
+PGC_summary_tidy_34569 <- PGC_summary_tidy %>% 
+  filter(circle_number %in% c(3, 4, 5, 6, 9)) %>%
+  group_by(team_name, match_number, day) %>%
+  mutate(mean_distance_34569 = mean(distance, na.rm = T)) %>%
+  ungroup() %>%
+  select(-c(circle_number))
+
+# create viz dataset with mean distance the same for all instances
+PGC_data <- suppressMessages(left_join(PGC_summary_tidy, PGC_summary_tidy_34569))
+PGC_data %<>% 
+  group_by(team_name, match_number, day, mean_distance) %>%
+  mutate(mean_distance_34569 = mean(mean_distance_34569, na.rm = T)) %>%
+  ungroup() # yesss!!!!
+
+distance_9 <- PGC_summary_tidy %>% 
+  filter(circle_number == 9) %>%
+  select(distance)
+# hist(distance_9$distance)
+
+distance_not9 <- PGC_summary_tidy %>% 
+  filter(circle_number != 9) %>%
+  select(distance)
+# hist(distance_not9$distance)
+
+# hist(PGC_summary_tidy$distance)
+
+# ok i fixed this issue by scaling distance for circle 9 relative to radius of circle 8 since scaling it by 8 cm gave me incomparably high values
+
+# oops this still isn't tidy!
+# i want one column for circle number
+PGC_summary_tidy <- PGC_summary %>% 
+  rename("1" = team_avg_distance_1,
+         "2" = team_avg_distance_2,
+         "3" = team_avg_distance_3,
+         "4" = team_avg_distance_4,
+         "5" = team_avg_distance_5,
+         "6" = team_avg_distance_6,
+         "7" = team_avg_distance_7,
+         "8" = team_avg_distance_8,
+         "9" = team_avg_distance_9) %>%
+  gather(circle_number, distance, "1":"9", factor_key = TRUE) %>% 
+  mutate(circle_number = as.numeric(circle_number))
+PGC_summary_tidy
+
+# average distance to all circles
+PGC_summary_tidy %<>% group_by(team_name, match_number, day) %>%
+  mutate(mean_distance = mean(distance, na.rm = T)) %>%
+  ungroup()
+
+# average distance only for circles 34569
+PGC_summary_tidy_34569 <- PGC_summary_tidy %>% 
+  filter(circle_number %in% c(3, 4, 5, 6, 9)) %>%
+  group_by(team_name, match_number, day) %>%
+  mutate(mean_distance_34569 = mean(distance, na.rm = T)) %>%
+  ungroup() %>%
+  select(-c(circle_number))
+
+# create viz dataset with mean distance the same for all instances
+PGC_data <- suppressMessages(left_join(PGC_summary_tidy, PGC_summary_tidy_34569))
+PGC_data %<>% 
+  group_by(team_name, match_number, day, mean_distance) %>%
+  mutate(mean_distance_34569 = mean(mean_distance_34569, na.rm = T)) %>%
+  ungroup() # yesss!!!!
+
+distance_9 <- PGC_summary_tidy %>% 
+  filter(circle_number == 9) %>%
+  select(distance)
+# hist(distance_9$distance)
+
+distance_not9 <- PGC_summary_tidy %>% 
+  filter(circle_number != 9) %>%
+  select(distance)
+# hist(distance_not9$distance)
+
+# hist(PGC_summary_tidy$distance)
+
+```
+
+**Who outplayed their circle favor in the group stage of the PUBG Global Championship?**
+
+Turns out grad school takes up a lot of your time – who knew! I'm finally back with a redesigned way to **visualize the impact of circle RNG on competitive PUBG.**
+
+It's taken me a long time to redevelop my process, but I've figured out how to create these plots using only data from the PUBG API, without recording data by hand, so now making them should take way less time.
+
+I have the data to look at recent phases and tournaments like the Nations Cup, and make some other types of visualizations, but **since the Global Championship is happening right now, I thought I'd put this out first.**
+
+Some quick notes for people who may not have seen my work before:
+
+* Circle favor or "luck" only **explains about 10-15%** of how a team performs in a match (depending on how I measure it); my goal here isn't to single out certain teams for being fed, it's to provide an **[accessible visualization of who is successfully playing better or worse than their circle favor alone would predict](https://pubgdataviz.netlify.com/post/2019-05-14-lucky-or-good/)**.
+
+* It's not always advantageous in all situations to be in the center compared to playing edge! But overall, teams earn **[~2 more points in a match for each circle that they are in](https://pubgdataviz.netlify.com/post/2019-05-31-how-many-points-for-each-circle/)**, roughly speaking. 
+
+* I tested **[which circles have a significant effect on the outcome of a match](https://pubgdataviz.netlify.com/post/2019-05-31-how-many-points-for-each-circle/)** and only use those in this analysis – for example, being in or out of the first circle has no effect on a team's points in a match.
+
+* And of course, there's also an element of skill to what I'm calling circle favor. Sometimes a circle landing on a team is just pure luck, but often it's skilled positioning and managing to consistently be in a good spot for the next phase.
+
+**Here’s how each team performed in the group stage of the PUBG Global Championship based on how close they were to the center of each new circle.**
+
+&#x200B;
+
+**PUBG Global Championship CIRCLE FAVOR**
+
+&#x200B;
+
+``` {r luck_visualization, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+# for viz, need only team, average points, average mean_distance_34569, average mean_distance
+# which one is more strongly related?
+
+model_all <- lm(points ~ mean_distance, PGC_data)
+summary(model_all) # p of mean distance < 10^-16, F statistic smaller, R squared 0.07 for semis teams only, 0.05 for all teams
+
+model_34569 <- lm(points ~ mean_distance_34569, PGC_data)
+summary(model_34569) # p of mean distance also < 10^-16, F statistic larger, R squared 0.14 so twice the strength of fit, 0.11 for all teams
+# explains 14% / 11% of the variation in the points/data/team performance in a match
+
+PGC_data_summary <-  PGC_data %>% 
+  group_by(team_name) %>%
+  summarize(mean_points = mean(points, na.rm = T),
+            mean_distance = mean(mean_distance, na.rm = T),
+            mean_distance_34569 = mean(mean_distance_34569, na.rm = T)) %>%
+  ungroup() # yesss!!!!
+unique(PGC_data_summary$team_name) # 32 teams
+
+PGC_data_summary$team_name
+
+write_csv(PGC_data_summary, here::here("PGC_data_summary.csv"))
+# dataloc <- here::here("static", "PGC_data_summary.csv")
+# PGC_data_summary <- read_csv(dataloc)
+# write_csv(PGC_data_summary, here::here("PGC_data_summary.csv"))
+
+
+# what teams have made it to semis
+semis_teams <- c("TSM", "TS", "VEN", "SDV", "LZR", "GEX", "QM", "SST", 
+                 "ENA", "GNS", "ENF", "NAVI", "GEN", "VC", "RUM", "IFTY", 
+                 "FAZE", "4AM", "AFF", "GG", "T1", "AHQ", "WCK", "RED")
+all_teams <- unique(PGC_data_summary$team_name)
+elim_teams <- all_teams[which(!all_teams %in% semis_teams)]
+elim_teams
+
+team_colours_semis <- c("thistle4", "blue3", "gray87", "indianred4", 
+                        "gray87", "gray87", "gray87", "maroon", 
+                        "deepskyblue3", "red2", "gray87", "gold3", 
+                        "lightcoral", "black", "darkorange1", "dodgerblue4", 
+                        "violetred1", "yellow2", "gray87", "magenta3", 
+                        "firebrick1", "gray87", "forestgreen", "darkseagreen3", 
+                        "tan2", "lightsalmon1", "gray87", "deepskyblue1",
+                        "gray40", "mediumorchid4", "violetred4", "deepskyblue4")
+
+# create new data to add stat_smooth bc abline won't scale with the x axis but stat_smooth seems to
+adjustment <- (sd(PGC_data_summary$mean_points) * 2)
+PGC_data_upper <- PGC_data_summary %>%
+  mutate(mean_points = mean_points + adjustment)
+PGC_data_lower <- PGC_data_summary %>%
+  mutate(mean_points = mean_points - adjustment)
+
+# create base plot of match points vs circle favor, constraining axes to centre the data
+p <- ggplot(PGC_data_summary, aes(x = mean_distance_34569, 
+                                  y = mean_points)) +
+  xlab("Proportional Distance from Circle Center") +
+  ylab("Points per Match") +
+  scale_y_continuous(expand = c(0, 0),
+                     limit = c(-20, 20)) +
+  scale_x_reverse(expand = c(0, 0),
+                  limit = c(2, 0)) +
+  coord_cartesian(xlim = c((2 * mean(PGC_data_summary$mean_distance_34569,
+                                     na.rm = T) - 0.83),
+                           0.83), 
+                  ylim = c(-0.6,
+                           (2 * mean(PGC_data_summary$mean_points, 
+                                     na.rm = T)) + 0.6)) +
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# add vertical line with mean circle favor
+p <- p + geom_vline(xintercept = mean(PGC_data_summary$mean_distance_34569,
+                                      na.rm = TRUE),
+                    size = 0.3,
+                    color = "gray90")
+
+# add horizontal line with mean match points
+p <- p + geom_hline(yintercept = mean(PGC_data_summary$mean_points),
+                    size = 0.3,
+                    color = "gray90")
+
+# add linear model of relationship between match points and circle favor
+p <- p + stat_smooth(method = "lm", fullrange = TRUE,
+                     col = "black", fill = NA,
+                     size = 0.3, na.rm = TRUE)
+
+# try adding lm for higher sd line # yes it works!!!!!!
+p <- p + stat_smooth(data = PGC_data_upper,
+                     method = "lm", fullrange = TRUE,
+                     col = "gray90", fill = NA,
+                     size = 0.3, na.rm = TRUE)
+
+# try adding lm for lower sd line
+p <- p + stat_smooth(data = PGC_data_lower,
+                     method = "lm", fullrange = TRUE,
+                     col = "gray90", fill = NA,
+                     size = 0.3, na.rm = TRUE)
+
+# set placement of corner labels
+annotations <- data.frame(
+  xpos = c(Inf, Inf, -Inf, -Inf), # right, right, left, left (flipped)
+  ypos = c(Inf, -Inf, Inf, -Inf), # up, down, up, down
+  annotateText = c("OUTPLAYING \n   BAD LUCK", # DEFYING FATE
+                   "CAN'T OVERCOME \n        BAD LUCK", # CAN'T BLAME EM
+                   "CAPITALIZING ON \n GOOD LUCK     ", # BLESSED
+                   "UNDERPERFORMING \n GOOD LUCK         "), # YIKES ZONE
+  # order: upper left, lower left, upper right, lower right
+  hjustvar <- c(-0.19, -0.125, 1.095, 1.075), 
+  vjustvar <- c(1.55, -0.55, 1.55, -0.55))
+
+# add corner labels to the plot
+p <- p + geom_text(data = annotations,
+                   aes(x = xpos, y = ypos,
+                       label = annotateText,
+                       family = "Helvetica"),
+                   color = "gray80",
+                   size = 3.1,
+                   hjust = hjustvar,
+                   vjust = vjustvar)
+
+# add team acronyms to the plot
+p <- p + geom_text_repel(aes(x = mean_distance_34569,
+                             y = mean_points,
+                             label = team_name,
+                             family = "Helvetica",
+                             fontface = "bold"),
+                         color = team_colours_semis,
+                         size = 4.3,
+                         force = 0.001)
+
+suppressWarnings(print(p))
+
+```
+
+^*Total points per match for each PUBG Global Championship team based on circle favor. Eliminated teams are in gray*^
+
+&#x200B;
+
+**How does this work?**
+
+This plot shows the relationship between each team's **average points per match** in the group stage of the PUBG Global Championship and their players' **average distance from the center of each new circle** at the moment that each new circle appeared. 
+
+These distances are scaled by the radius of the circle, as each circle is a different size and there are two different map sizes in play*. The distance values on the x-axis are reversed, so teams that happened to be closer to the new circle center are on the right hand side, and teams that were farther away are on the left – this is just for ease of interpretation and to provide continuity from my previous plots.
+
+This analysis is different from my old method; I used to use a simple binary metric of whether a team was inside or outside of each circle and plot the proportion of circles they were in compared to their average performance.
+
+Every team **above the black line is playing better than we would expect if we knew only their circle favor**, and teams below the line are not quite living up to that predicted performance.
+
+The gray lines parallel to the black line represent two standard deviations from the mean in points per match – teams closer to those lines are performing much better or much worse than teams closer to the central black line. Eliminated teams are in gray.
+
+**4AM and AFF really stand out as outplaying the hand they were dealt, especially AFF, who have had the fifth-worst circle favor.** Entus Ace and Team SoloMid are also killing it and making the most of their positioning – of the teams with similar luck, they're really capitalizing on their situation.
+
+&#x200B;
+
+**What about the eliminated teams?**
+
+&#x200B;
+
+``` {r luck_visualization_elim, echo = FALSE, results = "hide", fig.height = 7.5, fig.width = 7.5}
+
+team_colours_elim <- c("gray87", "gray87", "mediumorchid1", "gray87", 
+                       "orange1", "lightseagreen", "tomato4", "gray87",
+                       "gray87", "gray87", "rosybrown", "gray87", 
+                       "gray87", "gray87", "gray87", "gray87", 
+                       "gray87", "gray87", "midnightblue", "gray87", 
+                       "gray87", "mediumpurple", "gray87", "gray87", 
+                       "gray87", "gray87", "slategray3", "gray87", 
+                       "gray87", "gray87", "gray87", "gray87")
+
+# create new data to add stat_smooth bc abline won't scale with the x axis but stat_smooth seems to
+adjustment <- (sd(PGC_data_summary$mean_points) * 2)
+PGC_data_upper <- PGC_data_summary %>%
+  mutate(mean_points = mean_points + adjustment)
+PGC_data_lower <- PGC_data_summary %>%
+  mutate(mean_points = mean_points - adjustment)
+
+# create base plot of match points vs circle favor, constraining axes to centre the data
+p <- ggplot(PGC_data_summary, aes(x = mean_distance_34569, 
+                                  y = mean_points)) +
+  xlab("Proportional Distance from Circle Center") +
+  ylab("Points per Match") +
+  scale_y_continuous(expand = c(0, 0),
+                     limit = c(-20, 20)) +
+  scale_x_reverse(expand = c(0, 0),
+                  limit = c(2, 0)) +
+  coord_cartesian(xlim = c((2 * mean(PGC_data_summary$mean_distance_34569,
+                                     na.rm = T) - 0.83),
+                           0.83), 
+                  ylim = c(-0.6,
+                           (2 * mean(PGC_data_summary$mean_points, 
+                                     na.rm = T)) + 0.6)) +
+  theme_bw() +
+  theme(axis.title.y = element_text(margin = margin(r = 20)),
+        axis.title.x = element_text(margin = margin(t = 20)),
+        text = element_text(family = "Helvetica"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+# add vertical line with mean circle favor
+p <- p + geom_vline(xintercept = mean(PGC_data_summary$mean_distance_34569,
+                                      na.rm = TRUE),
+                    size = 0.3,
+                    color = "gray90")
+
+# add horizontal line with mean match points
+p <- p + geom_hline(yintercept = mean(PGC_data_summary$mean_points),
+                    size = 0.3,
+                    color = "gray90")
+
+# add linear model of relationship between match points and circle favor
+p <- p + stat_smooth(method = "lm", fullrange = TRUE,
+                     col = "black", fill = NA,
+                     size = 0.3, na.rm = TRUE)
+
+# try adding lm for higher sd line # yes it works!!!!!!
+p <- p + stat_smooth(data = PGC_data_upper,
+                     method = "lm", fullrange = TRUE,
+                     col = "gray90", fill = NA,
+                     size = 0.3, na.rm = TRUE)
+
+# try adding lm for lower sd line
+p <- p + stat_smooth(data = PGC_data_lower,
+                     method = "lm", fullrange = TRUE,
+                     col = "gray90", fill = NA,
+                     size = 0.3, na.rm = TRUE)
+
+# set placement of corner labels
+annotations <- data.frame(
+  xpos = c(Inf, Inf, -Inf, -Inf), # right, right, left, left (flipped)
+  ypos = c(Inf, -Inf, Inf, -Inf), # up, down, up, down
+  annotateText = c("OUTPLAYING \n   BAD LUCK", # DEFYING FATE
+                   "CAN'T OVERCOME \n        BAD LUCK", # CAN'T BLAME EM
+                   "CAPITALIZING ON \n GOOD LUCK     ", # BLESSED
+                   "UNDERPERFORMING \n GOOD LUCK         "), # YIKES ZONE
+  # order: upper left, lower left, upper right, lower right
+  hjustvar <- c(-0.19, -0.125, 1.095, 1.075), 
+  vjustvar <- c(1.55, -0.55, 1.55, -0.55))
+
+# add corner labels to the plot
+p <- p + geom_text(data = annotations,
+                   aes(x = xpos, y = ypos,
+                       label = annotateText,
+                       family = "Helvetica"),
+                   color = "gray80",
+                   size = 3.1,
+                   hjust = hjustvar,
+                   vjust = vjustvar)
+
+# add team acronyms to the plot
+p <- p + geom_text_repel(aes(x = mean_distance_34569,
+                             y = mean_points,
+                             label = team_name,
+                             family = "Helvetica",
+                             fontface = "bold"),
+                         color = team_colours_elim,
+                         size = 4.3,
+                         force = 0.001)
+
+suppressWarnings(print(p))
+
+```
+
+^*Total points per match for each PUBG Global Championship team based on circle favor. Eliminated teams are highlighted.*^
+
+&#x200B;
+
+The teams that have been eliminated weren't particularly lucky or unlucky, as far as I can tell. They didn't tend to have unusually good or bad circle positions on average, except CrowCrowd, who really got a raw deal.
+
+As always, my .Rmd file is [here](https://github.com/vecoris/PUBG_Dataviz/blob/master/2019-11-16-PGC.Rmd), for those of you who are interested.
+
+&#x200B;
+
+**tl;dr Circle favor at the PUBG Global Championship during the group stage, with a new way of measuring circle favor as the average distance from the center of each new circle.
+
+So far, 4AM and AFF really stand out as outplaying the hand they were dealt, especially AFF, who have had the fifth-worst circle favor. Entus Ace and Team SoloMid are making the most of their positioning.**
+
+*Except for "circle 9," the final point, which is only 16 cm or so in diameter on the map. For this circle, I used the radius of circle 8 as the scale factor so that the scaled distances wouldn't be enormous and disproportionately raise the average distance of teams who survived to circle 9.
+
+I also have to note that, for whatever reason, the Sanhok match on day 1 of the group stage didn't make its way into the permanently stored API tournament data, so if something particularly extreme happened to your favorite team in that match, you're free to say that these plots aren't representative of their luck or performance ;)
